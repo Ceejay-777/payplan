@@ -1,0 +1,1140 @@
+openapi: 3.0.3
+info:
+  title: PayPlan API
+  version: 1.0.0
+  description: API for PayPlan recurring payment enforcement.
+paths:
+  /api/authcards:
+    get:
+      operationId: authcards_list
+      tags:
+      - Cards
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SavedCard'
+          description: ''
+  /api/authcards/{sqid}:
+    get:
+      operationId: authcards_retrieve
+      parameters:
+      - in: path
+        name: sqid
+        schema:
+          type: string
+        required: true
+      tags:
+      - Cards
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedCard'
+          description: ''
+    delete:
+      operationId: authcards_destroy
+      parameters:
+      - in: path
+        name: sqid
+        schema:
+          type: string
+        required: true
+      tags:
+      - Cards
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/authcards/{sqid}/set-default:
+    put:
+      operationId: authcards_set_default_update
+      parameters:
+      - in: path
+        name: sqid
+        schema:
+          type: string
+        required: true
+      tags:
+      - Cards
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavedCard'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SavedCard'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SavedCard'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedCard'
+          description: ''
+    patch:
+      operationId: authcards_set_default_partial_update
+      parameters:
+      - in: path
+        name: sqid
+        schema:
+          type: string
+        required: true
+      tags:
+      - Cards
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSavedCard'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSavedCard'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSavedCard'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedCard'
+          description: ''
+  /api/authcards/tokenize:
+    post:
+      operationId: authcards_tokenize_create
+      tags:
+      - Cards
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenizeCard'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenizeCard'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenizeCard'
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenizeCard'
+          description: ''
+  /api/authlogin:
+    post:
+      operationId: authlogin_create
+      description: Mixin for views that do not require authentication.
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Login'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Login'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Login'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Login'
+          description: ''
+  /api/authlogout:
+    post:
+      operationId: authlogout_create
+      description: |-
+        Takes a token and blacklists it. Must be used with the
+        `rest_framework_simplejwt.token_blacklist` app installed.
+      tags:
+      - authlogout
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenBlacklist'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenBlacklist'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenBlacklist'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenBlacklist'
+          description: ''
+  /api/authsignup:
+    post:
+      operationId: authsignup_create
+      description: Mixin for views that do not require authentication.
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Signup'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Signup'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Signup'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Signup'
+          description: ''
+  /api/authtoken/refresh:
+    post:
+      operationId: authtoken_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - authtoken
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/authverify-email:
+    post:
+      operationId: authverify_email_create
+      description: Mixin for views that do not require authentication.
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyEmail'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VerifyEmail'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VerifyEmail'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyEmail'
+          description: ''
+  /api/plans:
+    get:
+      operationId: plans_list
+      tags:
+      - Plans
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PayPlan'
+          description: ''
+  /api/plans{sqid}:
+    get:
+      operationId: plans_retrieve
+      parameters:
+      - in: path
+        name: sqid
+        schema:
+          type: string
+        required: true
+      tags:
+      - Plans
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayPlan'
+          description: ''
+  /api/plans{sqid}/confirm-cancellation:
+    post:
+      operationId: plans_confirm_cancellation_create
+      parameters:
+      - in: path
+        name: sqid
+        schema:
+          type: string
+        required: true
+      tags:
+      - Cancellation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmCancellation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConfirmCancellation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConfirmCancellation'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmCancellation'
+          description: ''
+  /api/plans{sqid}/pause:
+    put:
+      operationId: plans_pause_update
+      parameters:
+      - in: path
+        name: sqid
+        schema:
+          type: string
+        required: true
+      tags:
+      - Plans
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PayPlan'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PayPlan'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PayPlan'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayPlan'
+          description: ''
+    patch:
+      operationId: plans_pause_partial_update
+      parameters:
+      - in: path
+        name: sqid
+        schema:
+          type: string
+        required: true
+      tags:
+      - Plans
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPayPlan'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPayPlan'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPayPlan'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayPlan'
+          description: ''
+  /api/plans{sqid}/request-cancellation:
+    post:
+      operationId: plans_request_cancellation_create
+      parameters:
+      - in: path
+        name: sqid
+        schema:
+          type: string
+        required: true
+      tags:
+      - Cancellation
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/plans{sqid}/resume:
+    put:
+      operationId: plans_resume_update
+      parameters:
+      - in: path
+        name: sqid
+        schema:
+          type: string
+        required: true
+      tags:
+      - Plans
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PayPlan'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PayPlan'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PayPlan'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayPlan'
+          description: ''
+    patch:
+      operationId: plans_resume_partial_update
+      parameters:
+      - in: path
+        name: sqid
+        schema:
+          type: string
+        required: true
+      tags:
+      - Plans
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPayPlan'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPayPlan'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPayPlan'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayPlan'
+          description: ''
+  /api/planscreate:
+    post:
+      operationId: planscreate_create
+      tags:
+      - Plans
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePayPlan'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreatePayPlan'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreatePayPlan'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatePayPlan'
+          description: ''
+  /api/planslink/{payment_link_token}:
+    get:
+      operationId: planslink_retrieve
+      description: Mixin for views that do not require authentication.
+      parameters:
+      - in: path
+        name: payment_link_token
+        schema:
+          type: string
+        required: true
+      tags:
+      - Payer Flow
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanLink'
+          description: ''
+  /api/planslink/{token}/authorize:
+    post:
+      operationId: planslink_authorize_create
+      description: Mixin for views that do not require authentication.
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - Payer Flow
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizePlan'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AuthorizePlan'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AuthorizePlan'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorizePlan'
+          description: ''
+  /api/transactions:
+    get:
+      operationId: transactions_list
+      tags:
+      - Transactions
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+          description: ''
+  /api/transactions{sqid}:
+    get:
+      operationId: transactions_retrieve
+      parameters:
+      - in: path
+        name: sqid
+        schema:
+          type: string
+        required: true
+      tags:
+      - Transactions
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+          description: ''
+components:
+  schemas:
+    AuthorizePlan:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        card_token:
+          type: string
+        last_four:
+          type: string
+          maxLength: 4
+        card_type:
+          type: string
+      required:
+      - card_token
+      - card_type
+      - email
+      - last_four
+    ConfirmCancellation:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        code:
+          type: string
+          maxLength: 6
+      required:
+      - code
+      - role
+    CreatePayPlan:
+      type: object
+      description: Rejects unknown fields. Use on any serializer that should not accept
+        extra data.
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        frequency:
+          $ref: '#/components/schemas/FrequencyEnum'
+        custom_interval_days:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        plan_type:
+          $ref: '#/components/schemas/PlanTypeEnum'
+        receiver_account_number:
+          type: string
+          maxLength: 20
+        receiver_bank_code:
+          type: string
+          maxLength: 10
+        receiver_name:
+          type: string
+          maxLength: 255
+        max_billing_cycles:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        card:
+          type: string
+          writeOnly: true
+      required:
+      - amount
+      - card
+      - frequency
+      - plan_type
+      - receiver_account_number
+      - receiver_bank_code
+      - receiver_name
+      - title
+    FrequencyEnum:
+      enum:
+      - DAILY
+      - WEEKLY
+      - MONTHLY
+      - ANNUAL
+      - CUSTOM
+      type: string
+      description: |-
+        * `DAILY` - Daily
+        * `WEEKLY` - Weekly
+        * `MONTHLY` - Monthly
+        * `ANNUAL` - Annual
+        * `CUSTOM` - Custom
+    Login:
+      type: object
+      description: Rejects unknown fields. Use on any serializer that should not accept
+        extra data.
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          writeOnly: true
+      required:
+      - email
+      - password
+    PatchedPayPlan:
+      type: object
+      properties:
+        sqid:
+          type: string
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        currency:
+          type: string
+          readOnly: true
+        frequency:
+          allOf:
+          - $ref: '#/components/schemas/FrequencyEnum'
+          readOnly: true
+        custom_interval_days:
+          type: integer
+          readOnly: true
+          nullable: true
+        plan_type:
+          allOf:
+          - $ref: '#/components/schemas/PlanTypeEnum'
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/PayPlanStatusEnum'
+          readOnly: true
+        receiver_account_number:
+          type: string
+          readOnly: true
+        receiver_bank_code:
+          type: string
+          readOnly: true
+        receiver_account_name:
+          type: string
+          readOnly: true
+        receiver_name:
+          type: string
+          readOnly: true
+        creator_name:
+          type: string
+          readOnly: true
+        payment_link_token:
+          type: string
+          readOnly: true
+        next_billing_date:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        billing_count:
+          type: integer
+          readOnly: true
+        max_billing_cycles:
+          type: integer
+          readOnly: true
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        ends_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedSavedCard:
+      type: object
+      properties:
+        sqid:
+          type: string
+          readOnly: true
+        last_four:
+          type: string
+          readOnly: true
+        card_type:
+          type: string
+          readOnly: true
+        is_default:
+          type: boolean
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PayPlan:
+      type: object
+      properties:
+        sqid:
+          type: string
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        currency:
+          type: string
+          readOnly: true
+        frequency:
+          allOf:
+          - $ref: '#/components/schemas/FrequencyEnum'
+          readOnly: true
+        custom_interval_days:
+          type: integer
+          readOnly: true
+          nullable: true
+        plan_type:
+          allOf:
+          - $ref: '#/components/schemas/PlanTypeEnum'
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/PayPlanStatusEnum'
+          readOnly: true
+        receiver_account_number:
+          type: string
+          readOnly: true
+        receiver_bank_code:
+          type: string
+          readOnly: true
+        receiver_account_name:
+          type: string
+          readOnly: true
+        receiver_name:
+          type: string
+          readOnly: true
+        creator_name:
+          type: string
+          readOnly: true
+        payment_link_token:
+          type: string
+          readOnly: true
+        next_billing_date:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        billing_count:
+          type: integer
+          readOnly: true
+        max_billing_cycles:
+          type: integer
+          readOnly: true
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        ends_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - amount
+      - billing_count
+      - created_at
+      - creator_name
+      - currency
+      - custom_interval_days
+      - description
+      - ends_at
+      - frequency
+      - max_billing_cycles
+      - next_billing_date
+      - payment_link_token
+      - plan_type
+      - receiver_account_name
+      - receiver_account_number
+      - receiver_bank_code
+      - receiver_name
+      - sqid
+      - started_at
+      - status
+      - title
+    PayPlanStatusEnum:
+      enum:
+      - DRAFT
+      - ACTIVE
+      - PAUSED
+      - CANCELLED
+      - COMPLETED
+      - EXPIRED
+      type: string
+      description: |-
+        * `DRAFT` - Draft
+        * `ACTIVE` - Active
+        * `PAUSED` - Paused
+        * `CANCELLED` - Cancelled
+        * `COMPLETED` - Completed
+        * `EXPIRED` - Expired
+    PlanLink:
+      type: object
+      properties:
+        title:
+          type: string
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        frequency:
+          allOf:
+          - $ref: '#/components/schemas/FrequencyEnum'
+          readOnly: true
+        creator_name:
+          type: string
+      required:
+      - amount
+      - creator_name
+      - frequency
+      - title
+    PlanTypeEnum:
+      enum:
+      - OPEN
+      - CLOSED
+      type: string
+      description: |-
+        * `OPEN` - Open
+        * `CLOSED` - Closed
+    RoleEnum:
+      enum:
+      - creator
+      - payer
+      type: string
+      description: |-
+        * `creator` - creator
+        * `payer` - payer
+    SavedCard:
+      type: object
+      properties:
+        sqid:
+          type: string
+          readOnly: true
+        last_four:
+          type: string
+          readOnly: true
+        card_type:
+          type: string
+          readOnly: true
+        is_default:
+          type: boolean
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - card_type
+      - created_at
+      - is_active
+      - is_default
+      - last_four
+      - sqid
+    Signup:
+      type: object
+      description: Rejects unknown fields. Use on any serializer that should not accept
+        extra data.
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        full_name:
+          type: string
+          maxLength: 255
+        password:
+          type: string
+          writeOnly: true
+          minLength: 8
+      required:
+      - email
+      - full_name
+      - password
+    TokenBlacklist:
+      type: object
+      properties:
+        refresh:
+          type: string
+          writeOnly: true
+      required:
+      - refresh
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenizeCard:
+      type: object
+      properties:
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        email:
+          type: string
+          format: email
+    Transaction:
+      type: object
+      properties:
+        sqid:
+          type: string
+          readOnly: true
+        plan:
+          type: integer
+          readOnly: true
+        plan_title:
+          type: string
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        currency:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/TransactionStatusEnum'
+          readOnly: true
+        nomba_reference:
+          type: string
+          readOnly: true
+          nullable: true
+        failure_reason:
+          type: string
+          readOnly: true
+          nullable: true
+        billing_cycle_number:
+          type: integer
+          readOnly: true
+        charged_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - amount
+      - billing_cycle_number
+      - charged_at
+      - created_at
+      - currency
+      - failure_reason
+      - nomba_reference
+      - plan
+      - plan_title
+      - sqid
+      - status
+    TransactionStatusEnum:
+      enum:
+      - PENDING
+      - SUCCESS
+      - FAILED
+      - REFUNDED
+      type: string
+      description: |-
+        * `PENDING` - Pending
+        * `SUCCESS` - Success
+        * `FAILED` - Failed
+        * `REFUNDED` - Refunded
+    VerifyEmail:
+      type: object
+      description: Rejects unknown fields. Use on any serializer that should not accept
+        extra data.
+      properties:
+        email:
+          type: string
+          format: email
+        otp:
+          type: string
+          maxLength: 6
+      required:
+      - email
+      - otp
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
