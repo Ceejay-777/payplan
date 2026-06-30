@@ -1,8 +1,9 @@
 {% extends "emails/base.html" %}
 
-{% block title %}Verify your email — PayPlan{% endblock %}
+{% block title %}Verify your email &mdash; PayPlan{% endblock %}
 
 {% block extra_styles %}
+<style>
 .otp-block {
   background: #F7F7F5;
   border: 1px solid #E5E5E3;
@@ -31,6 +32,7 @@
   color: #A3A39E;
   line-height: 1.5;
 }
+</style>
 {% endblock %}
 
 {% block content %}

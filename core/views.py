@@ -6,8 +6,6 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.views import (
     TokenObtainPairView, TokenRefreshView, TokenBlacklistView
 )
-from rest_framework_simplejwt.tokens import RefreshToken, UntypedToken
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from drf_spectacular.utils import extend_schema
 
 from payplan.views import PublicGenericAPIView
@@ -123,6 +121,7 @@ class VerifyEmailView(PublicGenericAPIView, generics.GenericAPIView):
         try:
             user = User.objects.get(email=serializer.validated_data['email'])
             verify_user_email(user, serializer.validated_data['otp'])
+            
             return Response({"detail": "Email verified successfully.", "status": "success"})
         
         except User.DoesNotExist:

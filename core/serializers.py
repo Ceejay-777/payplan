@@ -37,7 +37,7 @@ class LoginSerializer(StrictFieldsMixin, serializers.Serializer):
 class VerifyEmailSerializer(StrictFieldsMixin, serializers.Serializer):
     email = serializers.EmailField()
     otp = serializers.CharField(max_length=6)
-
+    
 class SavedCardSerializer(serializers.ModelSerializer):
     class Meta:
         model = SavedCard

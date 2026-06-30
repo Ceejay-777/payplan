@@ -6,6 +6,12 @@ from payplan.utils.email_service import send_html_email
 
 @transaction.atomic
 def create_user(validated_data):
+    email = validated_data.get("email")
+    exisiting_inactive_user = User.objects.filter(email=email, is_active=False).first()
+    
+    if exisiting_inactive_user:
+        return exisiting_inactive_user.delete()
+    
     user = User.objects.create_user(**validated_data)
     otp  = OTP.generate_otp(user)
 
