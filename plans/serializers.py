@@ -3,6 +3,14 @@ from .models import PayPlan, CancellationRequest
 from core.models import SavedCard
 from payplan.mixins import StrictFieldsMixin
 
+class ResolveBankSerializer(serializers.Serializer):
+    account_number = serializers.CharField()
+    bank_code = serializers.CharField()
+    
+    account_name = serializers.CharField(read_only=True)
+    resolution_token = serializers.CharField(read_only=True)
+    
+
 class PayPlanSerializer(serializers.ModelSerializer):
     creator_name = serializers.CharField(source='creator.full_name', read_only=True)
 
@@ -11,34 +19,40 @@ class PayPlanSerializer(serializers.ModelSerializer):
         fields = [
             'sqid', 'title', 'description', 'amount', 'currency', 
             'frequency', 'custom_interval_days', 'plan_type', 'status',
-            'receiver_account_number', 'receiver_bank_code', 
-            'receiver_account_name', 'receiver_name', 'creator_name',
-            'payment_link_token', 'next_billing_date', 'billing_count',
+            'receiver_name', 'creator_name', 'payment_link_token', 
+            'next_billing_date', 'billing_count',
             'max_billing_cycles', 'started_at', 'ends_at', 'created_at'
         ]
         read_only_fields = fields
 
-class CreatePayPlanSerializer(StrictFieldsMixin, serializers.ModelSerializer):
+class CreateSelfFundedPayPlanSerializer(StrictFieldsMixin, serializers.ModelSerializer):
     card = serializers.SlugRelatedField(
         queryset=SavedCard.objects.all(),
         slug_field='sqid',
         required=True,
         write_only=True
     )
+    
+    resolution_id = serializers.CharField(read_only=True)
 
     class Meta:
         model = PayPlan
         fields = [
             'title', 'description', 'amount', 'frequency', 
-            'custom_interval_days', 'plan_type', 'receiver_account_number', 
-            'receiver_bank_code', 'receiver_name', 'max_billing_cycles', 'card'
+            'custom_interval_days', 'plan_type',
+            'receiver_name', 'max_billing_cycles', 'card'
         ]
 
     def validate(self, attrs):
+        user = self["context"].request.user
+        card = attrs['card']
+        
         if attrs['frequency'] == PayPlan.Frequency.CUSTOM and not attrs.get('custom_interval_days'):
             raise serializers.ValidationError("custom_interval_days is required for CUSTOM frequency.")
         
-        # In actual implementation, we'd verify the card belongs to the user here
+        if card.user != user:
+            raise serializers.ValidationError("Card does not belong to user.")
+        
         # or handle guest card tokens.
         return attrs
 

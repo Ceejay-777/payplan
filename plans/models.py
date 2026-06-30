@@ -37,7 +37,7 @@ class PayPlan(BaseModel):
     receiver_account_number = models.CharField(max_length=20)
     receiver_bank_code = models.CharField(max_length=10)
     receiver_account_name = models.CharField(max_length=255)
-    receiver_name = models.CharField(max_length=255) # human label
+    receiver_name = models.CharField(max_length=255) 
     
     payer_email = models.EmailField(null=True, blank=True)
     payer_card = models.ForeignKey(
@@ -51,7 +51,7 @@ class PayPlan(BaseModel):
     payment_link_token = models.CharField(max_length=64, unique=True)
     payment_link_expires_at = models.DateTimeField(null=True, blank=True)
     
-    engine_subscription_id = models.CharField(max_length=255, null=True, blank=True)
+    subscription_id = models.CharField(max_length=255, null=True, blank=True)
     next_billing_date = models.DateTimeField(null=True, blank=True)
     billing_count = models.IntegerField(default=0)
     max_billing_cycles = models.IntegerField(null=True, blank=True)
@@ -61,7 +61,6 @@ class PayPlan(BaseModel):
     def activate(self):
         self.status = self.Status.ACTIVE
         self.started_at = timezone.now()
-        # next_billing_date should be calculated by service
         self.save(update_fields=['status', 'started_at'])
 
     def pause(self):

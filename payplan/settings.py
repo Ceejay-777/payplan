@@ -170,3 +170,8 @@ ANYMAIL = {
     "BREVO_API_KEY": os.getenv("BREVO_API_KEY"),
 }
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
+}

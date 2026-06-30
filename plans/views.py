@@ -5,35 +5,51 @@ from drf_spectacular.utils import extend_schema
 from payplan.views import PublicGenericAPIView
 from .models import PayPlan, CancellationRequest
 from .serializers import (
-    PayPlanSerializer, CreatePayPlanSerializer, PlanLinkSerializer,
-    AuthorizePlanSerializer, CancellationRequestSerializer, ConfirmCancellationSerializer
+    PayPlanSerializer, CreateSelfFundedPayPlanSerializer, PlanLinkSerializer,
+    AuthorizePlanSerializer, CancellationRequestSerializer, ConfirmCancellationSerializer,
+    ResolveBankSerializer
 )
 from .services import (
-    create_plan, activate_plan, authorize_plan, cancel_plan,
-    request_cancellation, confirm_cancellation, generate_payment_link
+    create_self_funded_plan, activate_plan, authorize_plan,
+    request_cancellation, confirm_cancellation, generate_payment_link,
+    resolve_and_cache_bank_account
+
 )
 
 @extend_schema(tags=["Plans"])
-class CreatePlanView(generics.CreateAPIView):
-    serializer_class = CreatePayPlanSerializer
-    permission_classes = [permissions.IsAuthenticated] # Needs to be IsRegisteredUser in prod
+class ResolveBankView(generics.GenericAPIView):
+    serializer_class = ResolveBankSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        resolution_data = resolve_and_cache_bank_account(request.user, serializer.validated_data)
+        
+        return Response({"data": serializer(resolution_data).data, "detail": "Bank account resolved successfully", "status": "success"}, status=status.HTTP_200_OK)
+    
+
+@extend_schema(tags=["Plans"], summary="Create a new pay plan")
+class CreateSelfFundedPlanView(generics.CreateAPIView):
+    serializer_class = CreateSelfFundedPayPlanSerializer
+    permission_classes = [permissions.IsAuthenticated] 
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        plan = create_plan(request.user, serializer.validated_data)
+        
+        plan = create_self_funded_plan(request.user, serializer.validated_data)
+        
         return Response(
             {
-                "data": {
-                    "plan": PayPlanSerializer(plan).data,
-                    "payment_link": generate_payment_link(plan)
-                },
+                "data": {"plan": PayPlanSerializer(plan).data},
                 "status": "success",
                 "detail": "Plan created successfully"
             },
             status=status.HTTP_201_CREATED
         )
-
+        
 @extend_schema(tags=["Plans"])
 class ListPlansView(generics.ListAPIView):
     serializer_class = PayPlanSerializer

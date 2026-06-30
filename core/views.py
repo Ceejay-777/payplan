@@ -16,7 +16,7 @@ from .serializers import (
 )
 from .services import create_user, verify_user_email, tokenize_card, set_default_card
 
-@extend_schema(tags=["Auth"])
+@extend_schema(tags=["Auth"], summary="Create a new user")
 class SignupView(PublicGenericAPIView, generics.CreateAPIView):
     serializer_class = SignupSerializer
 
@@ -35,7 +35,7 @@ class SignupView(PublicGenericAPIView, generics.CreateAPIView):
             status=status.HTTP_201_CREATED
         )
 
-@extend_schema(tags=["Auth"])
+@extend_schema(tags=["Auth"], summary="Login a user")
 class LoginView(PublicGenericAPIView, TokenObtainPairView):
     
     def post(self, request, *args, **kwargs):
@@ -59,7 +59,7 @@ class LoginView(PublicGenericAPIView, TokenObtainPairView):
         
         return response
 
-@extend_schema(tags=["Auth"])
+@extend_schema(tags=["Auth"], summary="Refresh a user's token")
 class RefreshTokenView(PublicGenericAPIView, TokenRefreshView):
 
     def post(self, request, *args, **kwargs):
@@ -87,7 +87,7 @@ class RefreshTokenView(PublicGenericAPIView, TokenRefreshView):
         return response
         
 
-@extend_schema(tags=["Auth"])
+@extend_schema(tags=["Auth"], summary="Logout a user")
 class LogoutView(PublicGenericAPIView, TokenBlacklistView):
 
     def post(self, request, *args, **kwargs):
@@ -110,7 +110,7 @@ class LogoutView(PublicGenericAPIView, TokenBlacklistView):
 
         return response
 
-@extend_schema(tags=["Auth"])
+@extend_schema(tags=["Auth"], summary="Verify a user's email")
 class VerifyEmailView(PublicGenericAPIView, generics.GenericAPIView):
     serializer_class = VerifyEmailSerializer
 

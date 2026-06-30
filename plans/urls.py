@@ -1,13 +1,13 @@
 from django.urls import path
 from .views import (
-    CreatePlanView, ListPlansView, RetrievePlanView, PausePlanView, 
+    CreateSelfFundedPlanView, ListPlansView, RetrievePlanView, PausePlanView, 
     ResumePlanView, PublicPlanLinkView, AuthorizePlanView,
     RequestCancellationView, ConfirmCancellationView
 )
 
 urlpatterns = [
     path('', ListPlansView.as_view(), name='list-plans'),
-    path('create', CreatePlanView.as_view(), name='create-plan'),
+    path('se/f-funded/create', CreateSelfFundedPlanView.as_view(), name='create-self-funded-plan'),
     path('<slug:sqid>', RetrievePlanView.as_view(), name='retrieve-plan'),
     path('<slug:sqid>/pause', PausePlanView.as_view(), name='pause-plan'),
     path('<slug:sqid>/resume', ResumePlanView.as_view(), name='resume-plan'),
