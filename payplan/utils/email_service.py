@@ -13,7 +13,7 @@ def send_text_email(subject: str, body: str, recipient: str):
         send_mail(
             subject=subject,
             message=body,
-            from_email=None,  # uses DEFAULT_FROM_EMAIL from settings
+            from_email=None,  
             recipient_list=[recipient],
         )
     except Exception as e:

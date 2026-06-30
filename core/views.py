@@ -1,3 +1,6 @@
+from django.conf import settings
+from django.db import transaction
+
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import (
@@ -5,7 +8,6 @@ from rest_framework_simplejwt.views import (
 )
 from rest_framework_simplejwt.tokens import RefreshToken, UntypedToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from django.conf import settings
 from drf_spectacular.utils import extend_schema
 
 from payplan.views import PublicGenericAPIView

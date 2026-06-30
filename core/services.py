@@ -2,17 +2,20 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from .models import User, SavedCard, OTP
-from payplan.utils.email_service import send_email_notification
+from payplan.utils.email_service import send_html_email
 
+@transaction.atomic
 def create_user(validated_data):
     user = User.objects.create_user(**validated_data)
-    # Side effect: Send OTP using the OTP model
-    otp = OTP.generate_otp(user)
-    send_email_notification(
-        "Verify your email",
-        f"Your OTP is {otp}",
-        [user.email]
+    otp  = OTP.generate_otp(user)
+
+    send_html_email(
+        subject="Verify your PayPlan email",
+        template_path="emails/otp.html",
+        recipient=user.email,
+        context={"otp":  otp}
     )
+
     return user
 
 def verify_user_email(user, otp):

@@ -1,6 +1,10 @@
 from pathlib import Path
 from datetime import timedelta
 import os
+from dotenv import load_dotenv
+from urllib.parse import urlparse, parse_qsl
+
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -20,7 +24,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    'anymail',
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -28,6 +31,7 @@ INSTALLED_APPS = [
     'django_q',
     'drf_spectacular',
     'django_sqids',
+    'anymail',
 
     'core',
     'plans',
@@ -67,13 +71,19 @@ TEMPLATES = [
 WSGI_APPLICATION = 'payplan.wsgi.application'
 
 
+tmpPostgres = urlparse(os.getenv("DATABASE_URL"))
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': tmpPostgres.path.replace('/', ''),
+        'USER': tmpPostgres.username,
+        'PASSWORD': tmpPostgres.password,
+        'HOST': tmpPostgres.hostname,
+        'PORT': 5432,
+        'OPTIONS': dict(parse_qsl(tmpPostgres.query)),
     }
 }
-
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -152,9 +162,11 @@ Q_CLUSTER = {
 DJANGO_SQIDS_MIN_LENGTH = 7
 
 EMAIL_BACKEND = "anymail.backends.brevo.EmailBackend"
+DEFAULT_FROM_EMAIL = "PayPlan <covenantcrackslord03@gmail.com>"
+
+SERVICE_BASE_URL   = os.getenv("SERVICE_BASE_URL", "http://localhost:8000")
 
 ANYMAIL = {
     "BREVO_API_KEY": os.getenv("BREVO_API_KEY"),
 }
 
-DEFAULT_FROM_EMAIL = "PayPlan <noreply@payplan.com>"

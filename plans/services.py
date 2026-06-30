@@ -5,7 +5,7 @@ from datetime import timedelta
 from .models import PayPlan, CancellationRequest
 from core.models import User, SavedCard
 from payplan.utils.generate import generate_unique_token, generate_otp
-from payplan.utils.email_service import send_email_notification
+# from payplan.utils.email_service import send_email_notification
 from .requests import register_with_subscription_engine, resolve_receiver_account
 
 def create_plan(creator, validated_data):
@@ -81,11 +81,11 @@ def authorize_plan(plan, payer_email, card_details):
         plan.save(update_fields=['payer_email', 'payer_card', 'next_billing_date'])
         
         # Notify payer
-        send_email_notification(
-            "Plan Authorized",
-            f"You have authorized the plan {plan.title}.",
-            [payer_email]
-        )
+        # send_email_notification(
+        #     "Plan Authorized",
+        #     f"You have authorized the plan {plan.title}.",
+        #     [payer_email]
+        # )
         return plan
 
 def cancel_plan(plan):
@@ -105,9 +105,9 @@ def request_cancellation(plan, initiated_by):
         )
         
         # Email codes
-        send_email_notification("Cancellation Code", f"Your code: {req.creator_code}", [plan.creator.email])
-        if plan.payer_email:
-            send_email_notification("Cancellation Code", f"Your code: {req.payer_code}", [plan.payer_email])
+        # send_email_notification("Cancellation Code", f"Your code: {req.creator_code}", [plan.creator.email])
+        # if plan.payer_email:
+        #     send_email_notification("Cancellation Code", f"Your code: {req.payer_code}", [plan.payer_email])
             
         return req
 

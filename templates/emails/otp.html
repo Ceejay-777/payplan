@@ -1,0 +1,62 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Verify your email — PayPlan{% endblock %}
+
+{% block extra_styles %}
+.otp-block {
+  background: #F7F7F5;
+  border: 1px solid #E5E5E3;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin: 24px 0;
+  text-align: center;
+}
+
+.otp-code {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #1A1A1A;
+  font-variant-numeric: tabular-nums;
+}
+
+.otp-expiry {
+  font-size: 12px;
+  color: #A3A39E;
+  margin-top: 8px;
+}
+
+.warning {
+  font-size: 13px;
+  color: #A3A39E;
+  line-height: 1.5;
+}
+{% endblock %}
+
+{% block content %}
+  <p class="eyebrow">Email Verification</p>
+  <h1>Confirm it's you</h1>
+  <p class="body-text">
+    Use the code below to verify your email address and activate your PayPlan account.
+  </p>
+
+  <div class="otp-block">
+    <div class="otp-code">{{ otp }}</div>
+    <div class="otp-expiry">Expires in 10 minutes</div>
+  </div>
+
+  <hr class="divider" />
+
+  <p class="warning">
+    If you didn't create a PayPlan account, you can safely ignore this email.
+    Someone may have entered your address by mistake.
+  </p>
+{% endblock %}
+
+{% block footer %}
+  <p>This code is private. PayPlan will never ask for it over email or phone.</p>
+  <!-- <p style="margin-top: 6px;">
+    &copy; {{ year }} PayPlan &nbsp;&middot;&nbsp;
+    <a href="{{ frontend_url }}/privacy">Privacy</a>
+  </p> -->
+{% endblock %}

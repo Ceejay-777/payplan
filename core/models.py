@@ -88,7 +88,7 @@ class OTP(BaseModel):
     verified = models.BooleanField(default=False)
     
     @classmethod
-    def generate_otp(cls, user, expiry_minutes=10):
+    def generate_otp(cls, user, expiry_minutes=10) -> str:
         otp_code = utils_generate_otp()
         expiry_time = timezone.now() + timedelta(minutes=expiry_minutes)
         created_at = timezone.now()
@@ -107,7 +107,7 @@ class OTP(BaseModel):
     def is_expired(self):
         return timezone.now() > self.expiry
 
-    def verify(self, otp):
+    def verify(self, otp): 
         if self.verified:
             return False, "OTP already used"
 

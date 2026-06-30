@@ -3,7 +3,7 @@ from datetime import timedelta
 from django_q.tasks import schedule
 from .models import Transaction, DunningAttempt
 from plans.models import PayPlan
-from payplan.utils.email_service import send_email_notification
+# from payplan.utils.email_service import send_email_notification
 
 def record_transaction(plan, nomba_reference, amount, cycle_number, status, failure_reason=None):
     transaction = Transaction.objects.create(
@@ -48,8 +48,8 @@ def handle_dunning_failure(attempt):
     if attempt.attempt_number == 3:
         plan = attempt.transaction.plan
         plan.pause()
-        send_email_notification(
-            "Payment Failed - Plan Paused",
-            f"All retry attempts for plan {plan.title} have failed. Your plan has been paused.",
-            [plan.payer_email]
-        )
+        # send_email_notification(
+        #     "Payment Failed - Plan Paused",
+        #     f"All retry attempts for plan {plan.title} have failed. Your plan has been paused.",
+        #     [plan.payer_email]
+        # )
