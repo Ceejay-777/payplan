@@ -8,7 +8,7 @@ import secrets
 from datetime import timedelta
 import logging
 
-from .models import PayPlan, CancellationRequest
+from .models import PayPlan, CancellationRequest, PayPlanEvent
 from .requests import create_subscription, resolve_bank_account, create_customer, create_sub_engine_plan
 
 from core.models import User
@@ -17,6 +17,17 @@ from payplan.utils.generate import generate_unique_token, generate_otp
 logger = logging.getLogger(__name__)
 
 BANK_RESOLUTION_TTL = 300 # 5 minutes
+
+def _log_plan_event(plan, event_type, previous_status, new_status, metadata=None):
+    event = PayPlanEvent.objects.create(
+        plan=plan,
+        event_type=event_type,
+        previous_status=previous_status,
+        new_status=new_status,
+        metadata=metadata or {}
+    )
+    
+    return event
 
 def resolve_and_cache_bank_account(user, resolution_data):
     """
@@ -89,24 +100,36 @@ def create_self_funded_plan(creator, validated_data):
         # Create subscription
         sub_engine_response = create_subscription(creator.sub_engine_customer_id, sub_engine_plan_id)
         
-        plan.engine_subscription_id = sub_engine_response["id"]
+        plan.subscription_engine_id = sub_engine_response["id"]
         plan.order_reference = sub_engine_response.get("order_reference", "")
         plan.status = PayPlan.Status.AWAITING_FUNDING
-        plan.save(update_fields=['engine_subscription_id', 'order_reference', 'status'])
+        
+        plan.save(update_fields=['subscription_engine_id', 'order_reference', 'status'])
+        
+        _log_plan_event(plan=plan, event_type=PayPlanEvent.EventTypes.PLAN_CREATED, new_status=plan.status)
         
     return plan, sub_engine_response.get("checkout_link", "")
 
 def activate_plan(plan, engine_data):
-    """
-    Called via webhook from engine.
-    """
+    previous_status = plan.status
+    
     plan.status = PayPlan.Status.ACTIVE
-    plan.started_at = timezone.now()
+    plan.started_at = engine_data["started_at"]
     plan.engine_subscription_id = engine_data["subscription_id"]
     plan.next_billing_date = engine_data["next_billing_date"]
     plan.card_last_four = engine_data["card_last_four"]
     plan.card_type = engine_data["card_type"]
-    plan.save()
+    
+    plan.save(update_fields=['status', 'started_at', 'engine_subscription_id', 'next_billing_date', 'card_last_four', 'card_type'])
+    
+    _log_plan_event(plan=plan, event_type=PayPlanEvent.EventTypes.SUBSCRIPTION_ACTIVATED, previous_status=previous_status, new_status=plan.status)
+    return plan
+
+def update_plan_for_charge(plan, engine_data):
+    plan.billing_count += 1
+    plan.next_billing_date = engine_data["next_billing_date"]
+    plan.save(update_fields=['next_billing_date', 'billing_count'])
+    
     return plan
 
 def cancel_plan(plan):

@@ -47,7 +47,7 @@ class PayPlan(BaseModel):
     payment_link_token = models.CharField(max_length=64, unique=True)
     payment_link_expires_at = models.DateTimeField(null=True, blank=True)
     
-    engine_subscription_id = models.CharField(max_length=255, null=True, blank=True)
+    subscription_engine_id = models.CharField(max_length=255, null=True, blank=True)
     next_billing_date = models.DateTimeField(null=True, blank=True)
     billing_count = models.IntegerField(default=0)
     max_billing_cycles = models.IntegerField(null=True, blank=True)
@@ -77,6 +77,18 @@ class PayPlan(BaseModel):
 
     def __str__(self):
         return f"{self.title} ({self.sqid})"
+    
+class PayPlanEvent(models.Model):
+    class EventTypes(models.TextChoices):
+        PLAN_CREATED = "PLAN_CREATED", "Plan Created"
+        SUBSCRIPTION_ACTIVATED = "SUBSCRIPTION_ACTIVATED", "Subscription Activated"
+    
+    plan = models.ForeignKey(PayPlan, on_delete=models.CASCADE, related_name='audit_logs')
+    event_type = models.CharField(choices=EventTypes.choices, max_length=50)
+    previous_status = models.CharField(choices=PayPlan.Status.choices, max_length=40, null=True, blank=True)
+    new_status = models.CharField(choices=PayPlan.Status.choices, max_length=40)
+    metadata = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
 
 class CancellationRequest(BaseModel):
     class InitiatedBy(models.TextChoices):

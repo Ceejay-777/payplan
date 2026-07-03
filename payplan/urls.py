@@ -1,12 +1,13 @@
-"""
-URL configuration for payplan project.
-"""
 from django.contrib import admin
 from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
+import django_eventstream
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+    
+    path("events/", include(django_eventstream.urls), {"channels": ["test"]}),
     
     # API endpoints
     path('api/auth/',         include('core.urls')),

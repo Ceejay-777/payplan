@@ -1,8 +1,12 @@
+import logging
 from pathlib import Path
 from datetime import timedelta
 import os
 from dotenv import load_dotenv
 from urllib.parse import urlparse, parse_qsl
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
 
 load_dotenv()
 
@@ -17,6 +21,9 @@ ALLOWED_HOSTS = ['*'] # Allowed for hackathon development
 
 
 INSTALLED_APPS = [
+    "daphne",
+    "django_eventstream",
+    
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -68,6 +75,7 @@ TEMPLATES = [
     },
 ]
 
+ASGI_APPLICATION = "payplan.asgi.application"
 WSGI_APPLICATION = 'payplan.wsgi.application'
 
 
@@ -175,3 +183,28 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
     }
 }
+
+EVENTSTREAM_REDIS = {
+    'host': 'redis',
+    'port': 6379,
+    'db': 0,
+}
+
+SENTRY_DSN = os.environ.get('SENTRY_DSN')
+
+sentry_logging = LoggingIntegration(
+    sentry_logs_level=logging.INFO,
+)
+
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration(), sentry_logging],
+        traces_sample_rate=0.1, 
+        profiles_sample_rate=0.1, 
+        send_default_pii=True, 
+        enable_logs=True,
+        environment=os.environ.get("ENVIRONMENT", "production"),
+    )
+    
+SUB_ENGINE_API_KEY = os.environ.get('SUB_ENGINE_API_KEY')
