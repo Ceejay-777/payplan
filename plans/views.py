@@ -5,12 +5,11 @@ from drf_spectacular.utils import extend_schema
 from payplan.views import PublicGenericAPIView
 from .models import PayPlan, CancellationRequest
 from .serializers import (
-    PayPlanSerializer, CreateSelfFundedPayPlanSerializer, PlanLinkSerializer,
-    AuthorizePlanSerializer, CancellationRequestSerializer, ConfirmCancellationSerializer,
-    ResolveBankSerializer
+    PayPlanSerializer, CreateSelfFundedPayPlanSerializer, PlanLinkSerializer, CancellationRequestSerializer, ConfirmCancellationSerializer,
+    ResolveBankSerializer, CreatePayPlanReadSerializer
 )
 from .services import (
-    create_self_funded_plan, activate_plan, authorize_plan,
+    create_self_funded_plan, activate_plan,
     request_cancellation, confirm_cancellation, generate_payment_link,
     resolve_and_cache_bank_account
 
@@ -30,7 +29,7 @@ class ResolveBankView(generics.GenericAPIView):
         return Response({"data": serializer(resolution_data).data, "detail": "Bank account resolved successfully", "status": "success"}, status=status.HTTP_200_OK)
     
 
-@extend_schema(tags=["Plans"], summary="Create a new pay plan")
+@extend_schema(tags=["Plans"], summary="Create a new pay plan", responses={201: CreatePayPlanReadSerializer})
 class CreateSelfFundedPlanView(generics.CreateAPIView):
     serializer_class = CreateSelfFundedPayPlanSerializer
     permission_classes = [permissions.IsAuthenticated] 
@@ -39,11 +38,11 @@ class CreateSelfFundedPlanView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        plan = create_self_funded_plan(request.user, serializer.validated_data)
+        plan, checkout_link = create_self_funded_plan(request.user, serializer.validated_data)
         
         return Response(
             {
-                "data": {"plan": PayPlanSerializer(plan).data},
+                "data": {"plan": PayPlanSerializer(plan).data, "checkout_link": checkout_link},
                 "status": "success",
                 "detail": "Plan created successfully"
             },
@@ -105,23 +104,23 @@ class PublicPlanLinkView(PublicGenericAPIView, generics.RetrieveAPIView):
     lookup_field = 'payment_link_token'
     queryset = PayPlan.objects.filter(status=PayPlan.Status.DRAFT) # Waiting for payer
 
-@extend_schema(tags=["Payer Flow"])
-class AuthorizePlanView(PublicGenericAPIView, generics.GenericAPIView):
-    serializer_class = AuthorizePlanSerializer
+# @extend_schema(tags=["Payer Flow"])
+# class AuthorizePlanView(PublicGenericAPIView, generics.GenericAPIView):
+#     serializer_class = AuthorizePlanSerializer
 
-    def post(self, request, token, *args, **kwargs):
-        plan = get_object_or_404(PayPlan, payment_link_token=token)
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+#     def post(self, request, token, *args, **kwargs):
+#         plan = get_object_or_404(PayPlan, payment_link_token=token)
+#         serializer = self.get_serializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
         
-        card_details = {
-            "token": serializer.validated_data['card_token'],
-            "last_four": serializer.validated_data['last_four'],
-            "card_type": serializer.validated_data['card_type']
-        }
+#         card_details = {
+#             "token": serializer.validated_data['card_token'],
+#             "last_four": serializer.validated_data['last_four'],
+#             "card_type": serializer.validated_data['card_type']
+#         }
         
-        authorize_plan(plan, serializer.validated_data['email'], card_details)
-        return Response({"detail": "Plan authorized successfully", "status": "success"})
+#         authorize_plan(plan, serializer.validated_data['email'], card_details)
+#         return Response({"detail": "Plan authorized successfully", "status": "success"})
 
 # Cancellation Flow
 @extend_schema(tags=["Cancellation"], exclude=True)

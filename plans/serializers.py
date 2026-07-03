@@ -1,6 +1,5 @@
 from rest_framework import serializers
 from .models import PayPlan, CancellationRequest
-from core.models import SavedCard
 from payplan.mixins import StrictFieldsMixin
 
 class ResolveBankSerializer(serializers.Serializer):
@@ -21,39 +20,30 @@ class PayPlanSerializer(serializers.ModelSerializer):
             'frequency', 'custom_interval_days', 'plan_type', 'status',
             'receiver_name', 'creator_name', 'payment_link_token', 
             'next_billing_date', 'billing_count',
-            'max_billing_cycles', 'started_at', 'ends_at', 'created_at'
+            'max_billing_cycles', 'started_at', 'ends_at', 'created_at',
+            'card_last_four', 'card_type'
         ]
         read_only_fields = fields
+        
+class CreatePayPlanReadSerializer(serializers.Serializer):
+    plan = PayPlanSerializer(read_only=True)
+    checkout_link = serializers.CharField(read_only=True)
 
 class CreateSelfFundedPayPlanSerializer(StrictFieldsMixin, serializers.ModelSerializer):
-    card = serializers.SlugRelatedField(
-        queryset=SavedCard.objects.all(),
-        slug_field='sqid',
-        required=True,
-        write_only=True
-    )
-    
-    resolution_id = serializers.CharField(read_only=True)
+    resolution_id = serializers.CharField(write_only=True)
 
     class Meta:
         model = PayPlan
         fields = [
             'title', 'description', 'amount', 'frequency', 
             'custom_interval_days', 'plan_type',
-            'receiver_name', 'max_billing_cycles', 'card'
+            'receiver_name', 'max_billing_cycles', 'resolution_id'
         ]
 
     def validate(self, attrs):
-        user = self["context"].request.user
-        card = attrs['card']
-        
         if attrs['frequency'] == PayPlan.Frequency.CUSTOM and not attrs.get('custom_interval_days'):
             raise serializers.ValidationError("custom_interval_days is required for CUSTOM frequency.")
         
-        if card.user != user:
-            raise serializers.ValidationError("Card does not belong to user.")
-        
-        # or handle guest card tokens.
         return attrs
 
 class PlanLinkSerializer(serializers.ModelSerializer):
@@ -63,12 +53,6 @@ class PlanLinkSerializer(serializers.ModelSerializer):
         model = PayPlan
         fields = ['title', 'amount', 'frequency', 'creator_name']
         read_only_fields = fields
-
-class AuthorizePlanSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    card_token = serializers.CharField() # From Nomba
-    last_four = serializers.CharField(max_length=4)
-    card_type = serializers.CharField()
 
 class CancellationRequestSerializer(serializers.ModelSerializer):
     class Meta:

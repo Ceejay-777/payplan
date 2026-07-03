@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from payplan.models import BaseModel
-from core.models import User, SavedCard
+from core.models import User
 
 class PayPlan(BaseModel):
     class Frequency(models.TextChoices):
@@ -16,12 +16,13 @@ class PayPlan(BaseModel):
         CLOSED = 'CLOSED', 'Closed'
 
     class Status(models.TextChoices):
-        DRAFT     = 'DRAFT',     'Draft'
-        ACTIVE    = 'ACTIVE',    'Active'
-        PAUSED    = 'PAUSED',    'Paused'
-        CANCELLED = 'CANCELLED', 'Cancelled'
-        COMPLETED = 'COMPLETED', 'Completed'
-        EXPIRED   = 'EXPIRED',   'Expired'
+        DRAFT            = 'DRAFT',            'Draft'
+        AWAITING_FUNDING = 'AWAITING_FUNDING', 'Awaiting Funding'
+        ACTIVE           = 'ACTIVE',           'Active'
+        PAUSED           = 'PAUSED',           'Paused'
+        CANCELLED        = 'CANCELLED',        'Cancelled'
+        COMPLETED        = 'COMPLETED',        'Completed'
+        EXPIRED          = 'EXPIRED',          'Expired'
 
     creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_plans')
     title = models.CharField(max_length=255)
@@ -32,7 +33,7 @@ class PayPlan(BaseModel):
     custom_interval_days = models.IntegerField(null=True, blank=True)
     
     plan_type = models.CharField(choices=PlanType.choices, max_length=10)
-    status = models.CharField(choices=Status.choices, max_length=10, default=Status.DRAFT)
+    status = models.CharField(choices=Status.choices, max_length=20, default=Status.DRAFT)
     
     receiver_account_number = models.CharField(max_length=20)
     receiver_bank_code = models.CharField(max_length=10)
@@ -40,18 +41,13 @@ class PayPlan(BaseModel):
     receiver_name = models.CharField(max_length=255) 
     
     payer_email = models.EmailField(null=True, blank=True)
-    payer_card = models.ForeignKey(
-        SavedCard, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='payer_plans'
-    )
+    card_last_four = models.CharField(max_length=4, null=True, blank=True)
+    card_type = models.CharField(max_length=20, null=True, blank=True)
     
     payment_link_token = models.CharField(max_length=64, unique=True)
     payment_link_expires_at = models.DateTimeField(null=True, blank=True)
     
-    subscription_id = models.CharField(max_length=255, null=True, blank=True)
+    engine_subscription_id = models.CharField(max_length=255, null=True, blank=True)
     next_billing_date = models.DateTimeField(null=True, blank=True)
     billing_count = models.IntegerField(default=0)
     max_billing_cycles = models.IntegerField(null=True, blank=True)

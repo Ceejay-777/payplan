@@ -1,36 +1,60 @@
 import requests
 from django.conf import settings
-
 import datetime
 
-# ENGINE_API_BASE_URL = "https://engine.payplan.app/api/v1"
+# Placeholder values, should be moved to settings/env
+SUB_ENGINE_BASE_URL = "https://engine.payplan.app/api/developer"
+SUB_ENGINE_API_KEY = "YOUR_API_KEY" 
 
-def create_subscription(plan):
-    """
-    Registers the plan with the external subscription engine.
-    Returns the sub_id.
-    """
-    # payload = {
-    #     "plan_id": plan.sqid,
-    #     "amount": str(plan.amount),
-    #     "frequency": plan.frequency,
-    #     "callback_url": "https://payplan.app/api/webhooks/engine"
-    # }
-    # try:
-    #     response = requests.post(f"{ENGINE_API_BASE_URL}/subscriptions", json=payload, timeout=10)
-    #     response.raise_for_status()
-    #     return response.json()['id']
-    # except Exception as e:
-    #     raise Exception(f"Failed to register plan with engine: {e}")
-    
+def _get_headers():
     return {
-        "subscription_id": "12345678",
-        "next_billing_date": datetime.now(),
-        # "amount": str(plan.amount),
-        # "frequency": plan.frequency,
-        # "callback_url": "https://payplan.app/api/webhooks/engine"
+        "Authorization": f"Bearer {SUB_ENGINE_API_KEY}",
+        "Content-Type": "application/json"
     }
 
+def create_customer(user):
+    """
+    Creates a customer in the sub-engine.
+    """
+    payload = {
+        "email": user.email,
+        "name": f"{user.first_name} {user.last_name}",
+    }
+    # response = requests.post(
+    #     f"{SUB_ENGINE_BASE_URL}/customers/", 
+    #     json=payload, 
+    #     headers=_get_headers(), 
+    #     timeout=10
+    # )
+    # response.raise_for_status()
+    # return response.json()['id']
+    return f"sub_engine_customer_id_placeholder-{user.sqid}"
+
+def create_sub_engine_plan(plan):
+    """
+    Creates a plan in the sub-engine.
+    """
+    payload = {
+        "name": plan.name,
+        "amount": str(plan.amount),
+        "currency": plan.currency,
+        "interval": plan.interval,
+        "interval_count": plan.interval_count,
+    }
+    return f"sub_engine_plan_id_placeholder-{plan.sqid}"
+
+def create_subscription(customer_id, plan_id):
+    """
+    Registers the subscription with the external subscription engine.
+    """
+    
+    payload = {
+        "customer": customer_id,
+        "plan": plan_id,
+        "idempotency_key": f"subscription-{customer_id}-{plan_id}"
+    }
+
+    
 def cancel_with_engine(engine_subscription_id):
     """
     Cancels the subscription in the engine.

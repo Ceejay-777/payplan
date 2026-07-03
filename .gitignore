@@ -1,4 +1,19 @@
-venv
-.env
-*.sqlite3
-test.py
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# SQLite DB (if using)
+db.sqlite3
+
+# Django stuff
+*.log
+media/
+staticfiles/
+
+# VSCode / IDE
+.vscode/
+.idea/
+
+.postman
+postman/

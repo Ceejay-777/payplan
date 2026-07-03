@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import User, SavedCard
+from .models import User
 from payplan.mixins import StrictFieldsMixin
 
 class UserSerializer(serializers.ModelSerializer):
@@ -37,27 +37,3 @@ class LoginSerializer(StrictFieldsMixin, serializers.Serializer):
 class VerifyEmailSerializer(StrictFieldsMixin, serializers.Serializer):
     email = serializers.EmailField()
     otp = serializers.CharField(max_length=6)
-    
-class SavedCardSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SavedCard
-        fields = [
-            'sqid', 'last_four', 'card_type', 'is_default', 
-            'is_active', 'created_at'
-        ]
-        read_only_fields = fields
-
-class TokenizeCardSerializer(serializers.Serializer):
-    # This might take some initial data for Nomba Checkout
-    amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
-    # email is optional, will use auth user or guest email
-    email = serializers.EmailField(required=False)
-    
-    def validate(self, attrs):
-        user = self["context"].request.user
-        email = attrs.get("email")
-        
-        if not user and not email:
-            raise serializers.ValidationError("Email is required for guest checkout.")
-        
-        return attrs

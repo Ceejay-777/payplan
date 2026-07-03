@@ -17,7 +17,7 @@ class OTPTestCase(TestCase):
     def test_create_user_generates_otp(self):
         user = create_user(self.user_data)
         self.assertIsNotNone(user)
-        self.assertFalse(user.is_verified)
+        self.assertFalse(user.is_active)
         
         # Verify OTP model instance exists
         otp_obj = OTP.objects.filter(user=user).first()
@@ -32,7 +32,7 @@ class OTPTestCase(TestCase):
         
         # Verify with correct code
         verified_user = verify_user_email(user, otp_obj.otp)
-        self.assertTrue(verified_user.is_verified)
+        self.assertTrue(verified_user.is_active)
         
         # Check database states
         otp_obj.refresh_from_db()
@@ -47,7 +47,7 @@ class OTPTestCase(TestCase):
         self.assertIn("Invalid OTP", str(context.exception))
         
         user.refresh_from_db()
-        self.assertFalse(user.is_verified)
+        self.assertFalse(user.is_active)
 
     def test_verify_user_email_expired_otp(self):
         user = create_user(self.user_data)
@@ -63,7 +63,7 @@ class OTPTestCase(TestCase):
         self.assertIn("This OTP has expired", str(context.exception))
         
         user.refresh_from_db()
-        self.assertFalse(user.is_verified)
+        self.assertFalse(user.is_active)
 
     def test_verify_user_email_already_used_otp(self):
         user = create_user(self.user_data)

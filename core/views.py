@@ -9,12 +9,12 @@ from rest_framework_simplejwt.views import (
 from drf_spectacular.utils import extend_schema
 
 from payplan.views import PublicGenericAPIView
-from .models import User, SavedCard
+from .models import User
 from .serializers import (
     SignupSerializer, UserSerializer, LoginSerializer, 
-    VerifyEmailSerializer, SavedCardSerializer, TokenizeCardSerializer
+    VerifyEmailSerializer
 )
-from .services import create_user, verify_user_email, tokenize_card, set_default_card
+from .services import create_user, verify_user_email
 
 @extend_schema(tags=["Auth"], summary="Create a new user")
 class SignupView(PublicGenericAPIView, generics.CreateAPIView):
@@ -126,61 +126,3 @@ class VerifyEmailView(PublicGenericAPIView, generics.GenericAPIView):
         
         except User.DoesNotExist:
             return Response({"detail": "User not found", "status": "error"}, status=status.HTTP_404_NOT_FOUND)
-        
-        
-
-
-@extend_schema(tags=["Cards"])
-class TokenizeCardView(generics.GenericAPIView):
-    serializer_class = TokenizeCardSerializer
-    # Payer might be guest or authenticated
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        user_or_email = request.user if request.user.is_authenticated else serializer.validated_data.get('email')
-        
-        checkout_url = tokenize_card(user_or_email, serializer.validated_data.get('amount'))
-        return Response({
-            "data": {"checkout_url": checkout_url},
-            "status": "success"
-        })
-
-@extend_schema(tags=["Cards"])
-class SavedCardListView(generics.ListAPIView):
-    serializer_class = SavedCardSerializer
-    
-    def get_queryset(self):
-        return SavedCard.objects.filter(user=self.request.user, is_active=True)
-
-@extend_schema(tags=["Cards"])
-class SavedCardDetailView(generics.RetrieveDestroyAPIView):
-    serializer_class = SavedCardSerializer
-    lookup_field = 'sqid'
-    
-    def get_queryset(self):
-        return SavedCard.objects.filter(user=self.request.user)
-
-    def perform_destroy(self, instance):
-        instance.is_active = False
-        instance.save(update_fields=['is_active'])
-
-@extend_schema(tags=["Cards"])
-class SetDefaultCardView(generics.UpdateAPIView):
-    serializer_class = SavedCardSerializer
-    lookup_field = 'sqid'
-    http_method_names = ["patch"]
-    
-    def get_queryset(self):
-        return SavedCard.objects.filter(user=self.request.user)
-
-    def patch(self, request, *args, **kwargs):
-        instance = self.get_object()
-        card = set_default_card(request.user, instance.sqid)
-        return Response({
-            "data": SavedCardSerializer(card).data,
-            "status": "success",
-            "detail": "Default card updated"
-        })

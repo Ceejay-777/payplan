@@ -38,44 +38,15 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     )
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
+    sub_engine_customer_id = models.CharField(max_length=255, null=True, blank=True)
 
     objects = UserManager()
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['full_name']
+    REQUIRED_FIELDS = ['first_name', 'last_name']
 
     def __str__(self):
         return f"{self.email} ({self.role})"
-
-class SavedCard(BaseModel):
-    user = models.ForeignKey(
-        User, 
-        on_delete=models.CASCADE, 
-        related_name='saved_cards', 
-        null=True, 
-        blank=True
-    )
-    guest_email = models.EmailField(null=True, blank=True)
-    nomba_token = models.CharField(max_length=255)
-    last_four = models.CharField(max_length=4)
-    card_type = models.CharField(max_length=20) # Visa, Mastercard, Verve
-    is_default = models.BooleanField(default=False)
-    is_active = models.BooleanField(default=True)
-
-    def clean(self):
-        if self.user and self.guest_email:
-            raise ValidationError("Either user or guest_email must be set, but not both.")
-        if not self.user and not self.guest_email:
-            raise ValidationError("Either user or guest_email must be set.")
-
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        identifier = self.user.email if self.user else self.guest_email
-        return f"{self.card_type} **** {self.last_four} ({identifier})"
-
 
 def default_expiry():
     return timezone.now() + timedelta(minutes=10)

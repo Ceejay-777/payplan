@@ -45,7 +45,6 @@ class Migration(migrations.Migration):
                 ('started_at', models.DateTimeField(blank=True, null=True)),
                 ('ends_at', models.DateTimeField(blank=True, null=True)),
                 ('creator', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='created_plans', to=settings.AUTH_USER_MODEL)),
-                ('payer_card', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='payer_plans', to='core.savedcard')),
             ],
             options={
                 'abstract': False,
