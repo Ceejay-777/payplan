@@ -1,7 +1,7 @@
 from django.db import transaction
 from plans.models import PayPlan
 from plans.services import activate_plan, update_plan_for_charge
-from transactions.services import record_transaction, schedule_dunning
+from transactions.services import record_transaction
 from transactions.models import Transaction, TransactionEvent
 from transactions.services import create_and_run_first_payout_attempt
 
@@ -102,41 +102,41 @@ def handle_billing_success(data):
     create_and_run_first_payout_attempt(plan, transaction_record)
 
 
-def handle_billing_failed(data):
-    try:
-        with transaction.atomic():
-            sub_engine_id = data.get('subscription_id')
-            plan = PayPlan.objects.select_for_update().get(engine_subscription_id=sub_engine_id)
+# def handle_billing_failed(data):
+#     try:
+#         with transaction.atomic():
+#             sub_engine_id = data.get('subscription_id')
+#             plan = PayPlan.objects.select_for_update().get(engine_subscription_id=sub_engine_id)
             
-            # Record failed transaction
-            transaction_record = record_transaction(
-                plan=plan,
-                charge_reference=data.get('reference'),
-                amount=plan.amount,
-                cycle_number=plan.billing_count + 1,
-                status=Transaction.Status.FAILED,
-                failure_reason=data.get('reason')
-            )
+#             # Record failed transaction
+#             transaction_record = record_transaction(
+#                 plan=plan,
+#                 charge_reference=data.get('reference'),
+#                 amount=plan.amount,
+#                 cycle_number=plan.billing_count + 1,
+#                 status=Transaction.Status.FAILED,
+#                 failure_reason=data.get('reason')
+#             )
             
-            # Schedule dunning
-            schedule_dunning(transaction_record)
-    except PayPlan.DoesNotExist:
-        pass
+#             # Schedule dunning
+#             schedule_dunning(transaction_record)
+#     except PayPlan.DoesNotExist:
+#         pass
 
-def handle_dunning_exhausted(data):
-    try:
-        engine_id = data.get('subscription_id')
-        plan = PayPlan.objects.get(engine_subscription_id=engine_id)
-        plan.pause()
-        # Notify payer (already handled in dunning service if internal, 
-        # but if from engine, we do it here)
-    except PayPlan.DoesNotExist:
-        pass
+# def handle_dunning_exhausted(data):
+#     try:
+#         engine_id = data.get('subscription_id')
+#         plan = PayPlan.objects.get(engine_subscription_id=engine_id)
+#         plan.pause()
+#         # Notify payer (already handled in dunning service if internal, 
+#         # but if from engine, we do it here)
+#     except PayPlan.DoesNotExist:
+#         pass
 
-def handle_subscription_cancelled(data):
-    try:
-        engine_id = data.get('subscription_id')
-        plan = PayPlan.objects.get(engine_subscription_id=engine_id)
-        plan.cancel()
-    except PayPlan.DoesNotExist:
-        pass
+# def handle_subscription_cancelled(data):
+#     try:
+#         engine_id = data.get('subscription_id')
+#         plan = PayPlan.objects.get(engine_subscription_id=engine_id)
+#         plan.cancel()
+#     except PayPlan.DoesNotExist:
+#         pass

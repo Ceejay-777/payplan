@@ -160,7 +160,7 @@ def handle_payout_failure(attempt, reason):
 def schedule_next_payout_attempt(failed_attempt):
     transaction = failed_attempt.transaction
     sentry_sdk.set_tag("transaction_id", transaction.sqid)
-    # Note: failed_attempt is not the new attempt, so don't tag attempt_id/number of the new one yet
+    # NOTE: failed_attempt is not the new attempt, so don't tag attempt_id/number of the new one yet
     
     next_attempt_number = failed_attempt.attempt_number + 1
     

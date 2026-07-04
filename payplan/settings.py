@@ -14,8 +14,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 SECRET_KEY = 'django-insecure-ufku8$$kjf0#co7&178se$03iv+4g&az=o3^8099!&yvnu46tv'
+ENVIRONMENT = os.getenv("ENVIRONMENT")
 
-DEBUG = True
+DEBUG = ENVIRONMENT = "DEVELOPMENT"
 
 ALLOWED_HOSTS = ['*'] # Allowed for hackathon development
 
@@ -206,5 +207,8 @@ if SENTRY_DSN:
         enable_logs=True,
         environment=os.environ.get("ENVIRONMENT", "production"),
     )
-    
+
+NOMBA_WEBHOOK_SECRET = os.environ.get("NOMBA_WEBHOOK_SECRET")  
 SUB_ENGINE_API_KEY = os.environ.get('SUB_ENGINE_API_KEY')
+BASE_URL = os.environ.get("BASE_URL", "http://127.0.0.1:8000/")
+PAYMENT_LINK_EXPIRY_MINUTES = 15

@@ -72,7 +72,7 @@ class DunningAttempt(BaseModel):
     attempt_number = models.IntegerField()
     scheduled_at = models.DateTimeField()
     attempted_at = models.DateTimeField(null=True, blank=True)
-    status = models.CharField(choices=Status.choices, max_length=10, default=Status.SCHEDULED)
+    status = models.CharField(choices=Status.choices, max_length=30, default=Status.SCHEDULED)
     failure_reason = models.TextField(null=True, blank=True)
     payout_reference = models.CharField(max_length=255, null=True, blank=True, unique=True)
 

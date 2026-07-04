@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.utils import timezone
 from django.core.cache import cache
+from django.conf import settings
 
 from rest_framework.exceptions import ValidationError
 
@@ -17,6 +18,8 @@ from payplan.utils.generate import generate_unique_token, generate_otp
 logger = logging.getLogger(__name__)
 
 BANK_RESOLUTION_TTL = 300 # 5 minutes
+BASE_URL = settings.BASE_URL
+PAYMENT_LINK_EXPIRY_MINUTES = settings.PAYMENT_LINK_EXPIRY_MINUTES
 
 def _log_plan_event(plan, event_type, previous_status, new_status, metadata=None):
     event = PayPlanEvent.objects.create(
@@ -29,7 +32,7 @@ def _log_plan_event(plan, event_type, previous_status, new_status, metadata=None
     
     return event
 
-def resolve_and_cache_bank_account(user, resolution_data):
+def resolve_and_cache_bank_account(resolution_data):
     """
     Resolve a bank account via Nomba, cache the result tied to this user,
     and return a one-time token the client must pass back at plan creation.
@@ -39,7 +42,7 @@ def resolve_and_cache_bank_account(user, resolution_data):
     account_name = resolve_bank_account(account_number, bank_code)
 
     resolution_token = secrets.token_urlsafe(24)
-    cache_key = f"bank_resolution-{user.sqid}-{resolution_token}"
+    cache_key = f"bank_resolution-{resolution_token}"
 
     cache.set(cache_key, {
         "account_number": account_number,
@@ -54,12 +57,12 @@ def resolve_and_cache_bank_account(user, resolution_data):
         "resolution_token": resolution_token,
     }
     
-def use_bank_resolution(user, resolution_token):
+def use_bank_resolution(resolution_token):
     """
     Fetch and invalidate a cached bank resolution.
     Raises ValidationError if missing, expired, or already used.
     """
-    cache_key = f"bank_resolution-{user.sqid}-{resolution_token}"
+    cache_key = f"bank_resolution-{resolution_token}"
     data = cache.get(cache_key)
 
     if not data:
@@ -72,8 +75,8 @@ def use_bank_resolution(user, resolution_token):
     return data
 
 def create_self_funded_plan(creator, validated_data):
-    resolution_id = validated_data.pop('resolution_id')
-    receiver_bank_details = use_bank_resolution(creator, resolution_id)
+    resolution_token = validated_data.pop('resolution_token')
+    receiver_bank_details = use_bank_resolution(resolution_token)
     
     with transaction.atomic():
         # Check/Create sub-engine customer
@@ -102,12 +105,60 @@ def create_self_funded_plan(creator, validated_data):
         
         plan.subscription_engine_id = sub_engine_response["id"]
         plan.order_reference = sub_engine_response.get("order_reference", "")
-        plan.status = PayPlan.Status.AWAITING_FUNDING
         
         plan.save(update_fields=['subscription_engine_id', 'order_reference', 'status'])
         
         _log_plan_event(plan=plan, event_type=PayPlanEvent.EventTypes.PLAN_CREATED, new_status=plan.status)
         
+    return plan, sub_engine_response.get("checkout_link", "")
+
+def initialize_link_funded_plan(validated_data):
+    resolution_token = validated_data.pop('resolution_token')
+    receiver_bank_details = use_bank_resolution(resolution_token)
+    
+    payment_link_token = generate_unique_token(),
+    
+    plan = PayPlan.objects.create(
+            receiver_account_name=receiver_bank_details["account_name"],
+            receiver_bank_code=receiver_bank_details["bank_code"],
+            receiver_account_number=receiver_bank_details["account_number"],
+            payment_link_token=payment_link_token,
+            payment_link_expires_at=timezone.now() + timedelta(minutes=PAYMENT_LINK_EXPIRY_MINUTES),
+            status=PayPlan.Status.DRAFT,
+            **validated_data
+        )
+    plan.refresh_from_db()
+    
+    resolution_link = f"{BASE_URL}?p={plan.sqid}&plt={payment_link_token}"
+    
+    return plan, resolution_link
+
+def resolve_link_funded_plan(plan, payer_email):
+    guest_user = User.objects.get(email=payer_email)
+    
+    if not guest_user:
+        # TODO: Send OTP to confirm email
+        guest_user = User.objects.create(email=payer_email, role=User.Role.GUEST)
+        
+    if not guest_user.sub_engine_customer_id:
+        customer_id = create_customer(guest_user)
+        guest_user.sub_engine_customer_id = customer_id
+        guest_user.save(update_fields=['sub_engine_customer_id'])
+        
+    
+    sub_engine_plan_id = create_sub_engine_plan(plan)
+    sub_engine_response = create_subscription(guest_user.sub_engine_customer_id, sub_engine_plan_id)
+    
+    previous_status = plan.status
+    plan.creator = guest_user
+    plan.subscription_engine_id = sub_engine_response["id"]
+    plan.order_reference = sub_engine_response.get("order_reference", "")
+    plan.status = PayPlan.Status.AWAITING_FUNDING
+    
+    plan.save(update_fields=['creator', 'subscription_engine_id', 'order_reference', 'status'])
+    
+    _log_plan_event(plan=plan, event_type=PayPlanEvent.EventTypes.PLAN_CREATED, previous_status=previous_status, new_status=plan.status)
+    
     return plan, sub_engine_response.get("checkout_link", "")
 
 def activate_plan(plan, engine_data):
@@ -123,6 +174,9 @@ def activate_plan(plan, engine_data):
     plan.save(update_fields=['status', 'started_at', 'engine_subscription_id', 'next_billing_date', 'card_last_four', 'card_type'])
     
     _log_plan_event(plan=plan, event_type=PayPlanEvent.EventTypes.SUBSCRIPTION_ACTIVATED, previous_status=previous_status, new_status=plan.status)
+    
+    #TODO: Notify user
+    
     return plan
 
 def update_plan_for_charge(plan, engine_data):
@@ -153,6 +207,3 @@ def confirm_cancellation(cancellation_request, role, code):
         return cancellation_request.confirm_creator(code)
     else:
         return cancellation_request.confirm_payer(code)
-
-def generate_payment_link(plan):
-    return f"https://payplan.app/p/{plan.payment_link_token}"

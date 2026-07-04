@@ -1,6 +1,10 @@
+from django.utils import timezone
+
 from rest_framework import serializers
+
 from .models import PayPlan, CancellationRequest
 from payplan.mixins import StrictFieldsMixin
+
 
 class ResolveBankSerializer(serializers.Serializer):
     account_number = serializers.CharField()
@@ -27,17 +31,17 @@ class PayPlanSerializer(serializers.ModelSerializer):
         
 class CreatePayPlanReadSerializer(serializers.Serializer):
     plan = PayPlanSerializer(read_only=True)
-    checkout_link = serializers.CharField(read_only=True)
+    resolution_link = serializers.CharField(read_only=True)
 
-class CreateSelfFundedPayPlanSerializer(StrictFieldsMixin, serializers.ModelSerializer):
-    resolution_id = serializers.CharField(write_only=True)
+class CreatePayPlanSerializer(StrictFieldsMixin, serializers.ModelSerializer):
+    resolution_token = serializers.CharField(write_only=True, required=True)
 
     class Meta:
         model = PayPlan
         fields = [
             'title', 'description', 'amount', 'frequency', 
             'custom_interval_days', 'plan_type',
-            'receiver_name', 'max_billing_cycles', 'resolution_id'
+            'receiver_name', 'max_billing_cycles', 'resolution_token'
         ]
 
     def validate(self, attrs):
@@ -45,14 +49,28 @@ class CreateSelfFundedPayPlanSerializer(StrictFieldsMixin, serializers.ModelSeri
             raise serializers.ValidationError("custom_interval_days is required for CUSTOM frequency.")
         
         return attrs
-
-class PlanLinkSerializer(serializers.ModelSerializer):
-    creator_name = serializers.CharField(source='creator.full_name')
-
-    class Meta:
-        model = PayPlan
-        fields = ['title', 'amount', 'frequency', 'creator_name']
-        read_only_fields = fields
+    
+class ResolveLinkFundedPayPlanSerializer(serializers.Serializer):
+    payer_email = serializers.EmailField(required=True)
+    plan = serializers.SlugRelatedField(queryset=PayPlan.objects.filter(status=PayPlan.Status.DRAFT), slug_field='sqid', required=True)
+    payment_link_token = serializers.CharField(read_only=True)
+    
+    def validate(self, attrs):
+        plan = attrs.get("plan")
+        payment_link_token = attrs.get("payment_link_token")
+        payment_link_expires_at = plan.payment_link_expires_at
+        
+        if payment_link_token != plan.payment_link_token:
+            #TODO: Raise error
+            pass 
+        
+        if payment_link_expires_at > timezone.now():
+            #TODO: Raise error
+            pass
+        
+        return attrs
+        
+        
 
 class CancellationRequestSerializer(serializers.ModelSerializer):
     class Meta:

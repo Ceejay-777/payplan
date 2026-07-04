@@ -24,7 +24,7 @@ class PayPlan(BaseModel):
         COMPLETED        = 'COMPLETED',        'Completed'
         EXPIRED          = 'EXPIRED',          'Expired'
 
-    creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_plans')
+    creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_plans', null=True, blank=True)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
@@ -32,20 +32,21 @@ class PayPlan(BaseModel):
     frequency = models.CharField(choices=Frequency.choices, max_length=10)
     custom_interval_days = models.IntegerField(null=True, blank=True)
     
-    plan_type = models.CharField(choices=PlanType.choices, max_length=10)
+    plan_type = models.CharField(choices=PlanType.choices, max_length=10, default=PlanType.OPEN)
     status = models.CharField(choices=Status.choices, max_length=20, default=Status.DRAFT)
     
     receiver_account_number = models.CharField(max_length=20)
     receiver_bank_code = models.CharField(max_length=10)
     receiver_account_name = models.CharField(max_length=255)
-    receiver_name = models.CharField(max_length=255) 
+    receiver_name = models.CharField(max_length=255, null=True, blank=True) 
     
     payer_email = models.EmailField(null=True, blank=True)
-    card_last_four = models.CharField(max_length=4, null=True, blank=True)
-    card_type = models.CharField(max_length=20, null=True, blank=True)
-    
     payment_link_token = models.CharField(max_length=64, unique=True)
     payment_link_expires_at = models.DateTimeField(null=True, blank=True)
+    
+    #TODO: Update this to payment
+    card_last_four = models.CharField(max_length=4, null=True, blank=True)
+    card_type = models.CharField(max_length=20, null=True, blank=True)
     
     subscription_engine_id = models.CharField(max_length=255, null=True, blank=True)
     next_billing_date = models.DateTimeField(null=True, blank=True)
@@ -53,30 +54,13 @@ class PayPlan(BaseModel):
     max_billing_cycles = models.IntegerField(null=True, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     ends_at = models.DateTimeField(null=True, blank=True)
-
-    def activate(self):
-        self.status = self.Status.ACTIVE
-        self.started_at = timezone.now()
-        self.save(update_fields=['status', 'started_at'])
-
-    def pause(self):
-        self.status = self.Status.PAUSED
-        self.save(update_fields=['status'])
-
-    def resume(self):
-        self.status = self.Status.ACTIVE
-        self.save(update_fields=['status'])
-
-    def cancel(self):
-        self.status = self.Status.CANCELLED
-        self.save(update_fields=['status'])
-
-    def complete(self):
-        self.status = self.Status.COMPLETED
-        self.save(update_fields=['status'])
-
-    def __str__(self):
-        return f"{self.title} ({self.sqid})"
+    
+    def save(self, *args, **kwargs):
+        if (self.status != self.Status.DRAFT) and not self.creator:
+            #TODO: raise validation error
+            pass
+        
+        super().save(*args, **kwargs)
     
 class PayPlanEvent(models.Model):
     class EventTypes(models.TextChoices):
@@ -112,18 +96,23 @@ class CancellationRequest(BaseModel):
     def confirm_creator(self, code):
         if self.is_expired():
             return False, "Request expired"
+        
         if self.creator_code != code:
             return False, "Invalid code"
+        
         self.creator_confirmed = True
         self.save(update_fields=['creator_confirmed'])
         self._check_and_cancel()
+        
         return True, "Creator confirmed"
 
     def confirm_payer(self, code):
         if self.is_expired():
             return False, "Request expired"
+        
         if self.payer_code != code:
             return False, "Invalid code"
+        
         self.payer_confirmed = True
         self.save(update_fields=['payer_confirmed'])
         self._check_and_cancel()

@@ -7,7 +7,6 @@ from drf_spectacular.utils import extend_schema
 import sentry_sdk
 
 from django.conf import settings
-from django.http import HttpResponse
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -15,12 +14,10 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 
 from .webhookshandlers import (
-    handle_billing_success, handle_billing_failed, 
-    handle_dunning_exhausted, handle_subscription_cancelled,
-    handle_subscription_activated
+    handle_billing_success, handle_subscription_activated
 )
 
-from .payout_handlers import handle_payout_success, handle_payout_failed, handle_payout_refund
+from .payout_handlers import handle_payout_success, handle_payout_refund
 
 sub_engine_api_key = settings.SUB_ENGINE_API_KEY
 nomba_webhook_secret = settings.NOMBA_WEBHOOK_SECRET
@@ -32,7 +29,6 @@ EVENT_HANDLERS = {
 
 NOMBA_EVENT_HANDLERS = {
     "payout_success": handle_payout_success,
-    "payout_failed": handle_payout_failed,
     "payout_refund": handle_payout_refund,
 }
 

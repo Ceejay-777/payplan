@@ -29,13 +29,14 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
         GUEST      = 'GUEST',      'Guest'
 
     email = models.EmailField(unique=True)
-    first_name = models.CharField(max_length=255)
-    last_name = models.CharField(max_length=255)
+    first_name = models.CharField(max_length=255, blank=True, null=True)
+    last_name = models.CharField(max_length=255, blank=True, null=True)
     role = models.CharField(
         max_length=20, 
         choices=Role.choices, 
         default=Role.REGISTERED
     )
+    
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
     sub_engine_customer_id = models.CharField(max_length=255, null=True, blank=True)
@@ -43,7 +44,6 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     objects = UserManager()
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['first_name', 'last_name']
 
     def __str__(self):
         return f"{self.email} ({self.role})"

@@ -19,14 +19,14 @@ def nomba_request(method, endpoint, payload=None, timeout=10):
         return response
     
     except requests.exceptions.RequestException as e:
-        sentry_sdk.logger.error("Nomba request failed", extra={"error": str(e), "endpoint": endpoint, "payload": payload})
+        sentry_sdk.logger.error("Nomba request failed", attributes={"error": str(e), "endpoint": endpoint, "payload": payload})
         raise 
     
 def sub_engine_request(method, endpoint, payload=None, timeout=10):
     """
     Helper function to make requests to the Sub-Engine API.
     """
-    url = f"https://<your-domain>/api/developer/"
+    url = f"https://<your-domain>/api/developer/{endpoint}/"
     
     headers = {
         'Authorization': f'Bearer {settings.SUB_ENGINE_API_KEY}',
@@ -38,5 +38,5 @@ def sub_engine_request(method, endpoint, payload=None, timeout=10):
         return response
     
     except requests.exceptions.RequestException as e:
-        sentry_sdk.logger.error("Sub-Engine request failed", extra={"error": str(e), "endpoint": endpoint, "payload": payload})
+        sentry_sdk.logger.error("Sub-Engine request failed", attributes={"error": str(e), "endpoint": endpoint, "payload": payload})
         raise 
