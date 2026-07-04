@@ -40,7 +40,7 @@ class TestPlans(TestCase):
 
     def test_payplan_draft_without_creator_guard(self):
         # This test should verify the model level constraint
-        plan = PayPlanFactory(status=PayPlan.Status.ACTIVE, creator=None)
+        plan = PayPlanFactory.build(status=PayPlan.Status.ACTIVE, creator=None)
         with self.assertRaises(ValidationError):
             plan.save()
             

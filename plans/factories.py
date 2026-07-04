@@ -7,7 +7,6 @@ class UserFactory(factory.django.DjangoModelFactory):
         model = User
     
     email = factory.Sequence(lambda n: f"user{n}@example.com")
-    username = factory.Sequence(lambda n: f"user{n}")
     # password = factory.PostGenerationMethodCall('set_password', 'password123')
 
 class PayPlanFactory(factory.django.DjangoModelFactory):

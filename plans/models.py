@@ -51,6 +51,7 @@ class PayPlan(BaseModel):
     card_type = models.CharField(max_length=20, null=True, blank=True)
     
     subscription_engine_id = models.CharField(max_length=255, null=True, blank=True)
+    order_reference = models.CharField(max_length=255, null=True, blank=True)
     next_billing_date = models.DateTimeField(null=True, blank=True)
     billing_count = models.IntegerField(default=0)
     max_billing_cycles = models.IntegerField(null=True, blank=True)
