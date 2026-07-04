@@ -3,7 +3,7 @@ from plans.models import PayPlan
 from plans.services import activate_plan, update_plan_for_charge
 from transactions.services import record_transaction, schedule_dunning
 from transactions.models import Transaction, TransactionEvent
-from transactions.services import initiate_payout
+from transactions.services import create_and_run_first_payout_attempt
 
 import sentry_sdk
 
@@ -96,7 +96,7 @@ def handle_billing_success(data):
         raise
     
     # Start payout process to the receiver account
-    initiate_payout(plan, transaction_record)
+    create_and_run_first_payout_attempt(plan, transaction_record)
 
 
 def handle_billing_failed(data):

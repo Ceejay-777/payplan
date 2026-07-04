@@ -65,6 +65,7 @@ class TransactionEvent(models.Model):
 class DunningAttempt(BaseModel):
     class Status(models.TextChoices):
         SCHEDULED = 'SCHEDULED', 'Scheduled'
+        AWAITING_CONFIRMATION = 'AWAITING_CONFIRMATION', 'Awaiting Confirmation'
         SUCCESS   = 'SUCCESS',   'Success'
         FAILED    = 'FAILED',    'Failed'
 
@@ -74,6 +75,7 @@ class DunningAttempt(BaseModel):
     attempted_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(choices=Status.choices, max_length=10, default=Status.SCHEDULED)
     failure_reason = models.TextField(null=True, blank=True)
+    payout_reference = models.CharField(max_length=255, null=True, blank=True, unique=True)
 
     def __str__(self):
         return f"Dunning Attempt {self.attempt_number} for Transaction {self.transaction.sqid}"

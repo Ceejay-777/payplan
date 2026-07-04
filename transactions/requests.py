@@ -3,6 +3,7 @@ from django.conf import settings
 import sentry_sdk
 
 from payplan.requests import nomba_request
+from transactions.exceptions import NombaConnectionError, NombaTransferRejected
 
 def transfer(amount, account_number, account_name, bank_code, merchant_tx_ref, sender_name, narration):
     payload = {
@@ -17,14 +18,22 @@ def transfer(amount, account_number, account_name, bank_code, merchant_tx_ref, s
     
     try:
         response = nomba_request("POST", "transfers", payload=payload)
-        data = response.json()
         
-        if response.ok and data.get("code") == "00":
-            return data.get("data")
-        
-        sentry_sdk.logger.error("Nomba transfer failed", extra={"response": data, "payload": payload})
-        raise Exception(f"Nomba transfer failed: {data.get('message', 'Unknown error')}")
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+        sentry_sdk.logger.error(
+            "Nomba transfer connection failed, outcome unknown",
+            attributes={"merchant_tx_ref": merchant_tx_ref, "error": str(e)},
+        )
+        raise NombaConnectionError(f"Unable to reach Nomba: {e}") from e
     
-    except Exception as e:
-        sentry_sdk.logger.error("Unable to reach Nomba transfer service", extra={"error": str(e)})
-        raise Exception("Unable to reach Nomba transfer service") from e
+    data = response.json()
+        
+    if response.ok and data.get("code") == "00":
+        return data.get("data")
+    
+    sentry_sdk.logger.error(
+        "Nomba transfer rejected",
+        attributes={"response": data, "merchant_tx_ref": merchant_tx_ref},
+    )
+    raise NombaTransferRejected(data.get("message", "Unknown error"))
+    
