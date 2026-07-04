@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from unittest.mock import patch, MagicMock
 from django.core.cache import cache
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from .models import PayPlan
 from .factories import PayPlanFactory, UserFactory
 from .services import (
@@ -27,7 +28,7 @@ class TestPlans(TestCase):
         }
         mock_create_customer.return_value = "cust_123"
         mock_create_sub_engine_plan.return_value = "plan_123"
-        mock_create_subscription.return_value = {"id": "sub_123", "checkout_link": "http://link.com"}
+        mock_create_subscription.return_value = {"id": "sub_123", "checkout_link": "http://link.com", "order_reference": "ref_123"}
 
         validated_data = {
             "title": "Test Plan",
@@ -41,6 +42,7 @@ class TestPlans(TestCase):
         self.assertEqual(plan.status, PayPlan.Status.AWAITING_FUNDING)
         self.assertEqual(plan.creator, self.user)
         self.assertEqual(plan.subscription_engine_id, "sub_123")
+        self.assertEqual(plan.order_reference, "ref_123")
         self.assertEqual(link, "http://link.com")
 
     @patch('plans.services.create_customer')
@@ -61,7 +63,8 @@ class TestPlans(TestCase):
             "resolution_token": "token123"
         }
         
-        with patch('plans.services.create_sub_engine_plan'), patch('plans.services.create_subscription'):
+        with patch('plans.services.create_sub_engine_plan'), patch('plans.services.create_subscription') as mock_sub:
+            mock_sub.return_value = {"id": "sub_123", "checkout_link": "http://link.com", "order_reference": "ref_123"}
             create_self_funded_plan(self.user, validated_data)
             
         mock_create_customer.assert_not_called()
@@ -96,10 +99,10 @@ class TestPlans(TestCase):
     @patch('plans.services.create_subscription')
     @patch('plans.services.create_customer')
     def test_resolve_link_funded_plan(self, mock_create_customer, mock_create_subscription, mock_create_sub_engine_plan):
-        plan = PayPlanFactory(status=PayPlan.Status.DRAFT)
+        plan = PayPlanFactory(status=PayPlan.Status.DRAFT, creator=None)
         mock_create_customer.return_value = "new_cust"
         mock_create_sub_engine_plan.return_value = "plan_123"
-        mock_create_subscription.return_value = {"id": "sub_123", "checkout_link": "http://link.com"}
+        mock_create_subscription.return_value = {"id": "sub_123", "checkout_link": "http://link.com", "order_reference": "ref_123"}
         
         plan, link = resolve_link_funded_plan(plan, "guest@example.com")
         
@@ -107,9 +110,10 @@ class TestPlans(TestCase):
         self.assertEqual(plan.creator.email, "guest@example.com")
         self.assertEqual(plan.creator.role, 'GUEST')
         self.assertEqual(plan.subscription_engine_id, "sub_123")
+        self.assertEqual(plan.order_reference, "ref_123")
 
     def test_activate_plan(self):
-        plan = PayPlanFactory(status=PayPlan.Status.AWAITING_FUNDING)
+        plan = PayPlanFactory(status=PayPlan.Status.AWAITING_FUNDING, creator=self.user)
         engine_data = {
             "started_at": timezone.now(),
             "subscription_id": "engine_sub_1",
@@ -117,15 +121,16 @@ class TestPlans(TestCase):
             "card_last_four": "4242",
             "card_type": "visa"
         }
-        
+
         activate_plan(plan, engine_data)
-        
+
         plan.refresh_from_db()
         self.assertEqual(plan.status, PayPlan.Status.ACTIVE)
-        self.assertEqual(plan.engine_subscription_id, "engine_sub_1")
+        self.assertEqual(plan.subscription_engine_id, "engine_sub_1")
+
 
     def test_update_plan_for_charge(self):
-        plan = PayPlanFactory(billing_count=0)
+        plan = PayPlanFactory(billing_count=0, creator=self.user)
         engine_data = {"next_billing_date": timezone.now() + timezone.timedelta(days=30)}
         
         update_plan_for_charge(plan, engine_data)
@@ -147,5 +152,5 @@ class TestPlans(TestCase):
         self.assertIsNotNone(cache.get(f"bank_resolution-{result['resolution_token']}"))
 
     def test_use_bank_resolution_invalid(self):
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(DRFValidationError):
             use_bank_resolution("invalid_token")

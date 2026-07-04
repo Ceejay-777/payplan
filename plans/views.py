@@ -78,7 +78,7 @@ class CreateLinkFundedPayPlan(generics.CreateAPIView):
             },
             status=status.HTTP_201_CREATED
         )
-@extend_schema(tags=["Payer Flow"])
+@extend_schema(tags=["Plans"])
 class ResolveLinkFundedPayPlanView(PublicGenericAPIView, generics.GenericAPIView):
     serializer_class = ResolveLinkFundedPayPlanSerializer
 
@@ -133,6 +133,7 @@ class PausePlanView(generics.UpdateAPIView):
 @extend_schema(tags=["Plans"])
 class ResumePlanView(generics.UpdateAPIView):
     serializer_class = PayPlanSerializer
+    http_method_names = ['patch']
     lookup_field = 'sqid'
 
     def get_queryset(self):
@@ -146,7 +147,7 @@ class ResumePlanView(generics.UpdateAPIView):
         return Response({"detail": "Plan resumed", "status": "success"})
 
 # Cancellation Flow
-@extend_schema(tags=["Cancellation"], exclude=True)
+@extend_schema(tags=["Plans"], exclude=True)
 class RequestCancellationView(generics.GenericAPIView):
     # This can be creator (auth) or payer (via token link - simplified for now)
     permission_classes = [permissions.AllowAny]
@@ -159,7 +160,7 @@ class RequestCancellationView(generics.GenericAPIView):
         req = request_cancellation(plan, initiated_by='CREATOR' if request.user.is_authenticated else 'PAYER')
         return Response({"detail": "Cancellation codes sent to both parties", "status": "success"})
 
-@extend_schema(tags=["Cancellation"])
+@extend_schema(tags=["Plans"], summary="Confirm cancellation of plans")
 class ConfirmCancellationView(generics.GenericAPIView):
     serializer_class = ConfirmCancellationSerializer
     permission_classes = [permissions.AllowAny]
