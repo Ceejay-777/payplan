@@ -6,6 +6,9 @@ import sentry_sdk
 def run_payout_retry(dunning_attempt_id):
     try:
         attempt = DunningAttempt.objects.get(sqid=dunning_attempt_id)
+        sentry_sdk.set_tag("transaction_id", attempt.transaction.sqid)
+        sentry_sdk.set_tag("attempt_id", attempt.sqid)
+        sentry_sdk.set_tag("attempt_number", attempt.attempt_number)
         
     except DunningAttempt.DoesNotExist:
         sentry_sdk.logger.error(

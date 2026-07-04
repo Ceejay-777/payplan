@@ -50,9 +50,10 @@ def handle_billing_success(data):
                 plan=plan, 
                 billing_cycle_number=cycle_number,
                 charge_reference=data.get('reference')
-            ).exists()
+            ).first()
             
             if existing_transaction:
+                sentry_sdk.set_tag("transaction_id", existing_transaction.sqid)
                 sentry_sdk.logger.info(
                     "Billing success already handled for plan {plan_id} and cycle {cycle}",
                     plan_id=plan.id,
@@ -69,6 +70,8 @@ def handle_billing_success(data):
                 status=Transaction.Status.CHARGE_SUCCESS,
                 event_type=TransactionEvent.EventTypes.CHARGE_SUCCEEDED
             )
+            
+            sentry_sdk.set_tag("transaction_id", transaction_record.sqid)
             
             # Update plan for next billing cycle
             update_plan_for_charge(plan, data)

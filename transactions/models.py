@@ -20,7 +20,6 @@ class Transaction(BaseModel):
     
     status = models.CharField(choices=Status.choices, max_length=20, default=Status.CHARGE_PENDING)
     charge_reference = models.CharField(max_length=255, null=True, blank=True)
-    payout_reference = models.CharField(max_length=255, null=True, blank=True)
     
     max_payout_attempts = models.IntegerField(default=3)
     payout_failure_reason = models.TextField(null=True, blank=True)

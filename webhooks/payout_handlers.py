@@ -6,9 +6,13 @@ from transactions.services import set_transaction_succeeded, handle_payout_failu
 
 def handle_payout_success(data):
     payout_reference = data.get('id')
+    sentry_sdk.set_tag("payout_reference", payout_reference)
     try:
         with db_transaction.atomic():
             attempt = DunningAttempt.objects.select_for_update().get(payout_reference=payout_reference)
+            sentry_sdk.set_tag("transaction_id", attempt.transaction.sqid)
+            sentry_sdk.set_tag("attempt_id", attempt.sqid)
+            sentry_sdk.set_tag("attempt_number", attempt.attempt_number)
             transaction = attempt.transaction
 
             if attempt.status == DunningAttempt.Status.SUCCESS:
@@ -33,10 +37,14 @@ def handle_payout_success(data):
 
 def handle_payout_refund(data):
     payout_reference = data.get('id')
+    sentry_sdk.set_tag("payout_reference", payout_reference)
     try:
         with db_transaction.atomic():
             attempt = DunningAttempt.objects.select_for_update().get(payout_reference=payout_reference)
-
+            sentry_sdk.set_tag("transaction_id", attempt.transaction.sqid)
+            sentry_sdk.set_tag("attempt_id", attempt.sqid)
+            sentry_sdk.set_tag("attempt_number", attempt.attempt_number)
+            
             if attempt.status in (DunningAttempt.Status.SUCCESS, DunningAttempt.Status.FAILED):
                 sentry_sdk.logger.info(
                     "Payout refund already handled for attempt {attempt_id}",

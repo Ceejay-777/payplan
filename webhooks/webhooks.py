@@ -108,6 +108,10 @@ class NombaWebhookView(APIView):
             event_type = event.get('event_type')
             data = event.get('data')
 
+            payout_reference = data.get('id')
+            if payout_reference:
+                sentry_sdk.set_tag("payout_reference", payout_reference)
+
             handler = NOMBA_EVENT_HANDLERS.get(event_type)
 
             if handler is None:

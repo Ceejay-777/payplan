@@ -72,6 +72,10 @@ def initiate_payout(attempt):
     Initiates a payout for a given transaction.
     """
     transaction = attempt.transaction
+    sentry_sdk.set_tag("transaction_id", transaction.sqid)
+    sentry_sdk.set_tag("attempt_id", attempt.sqid)
+    sentry_sdk.set_tag("attempt_number", attempt.attempt_number)
+    
     plan = transaction.plan
     merchant_tx_ref=f"PAYOUT_{transaction.sqid}_ATTEMPT_{attempt.attempt_number}"
     
@@ -126,6 +130,9 @@ def handle_payout_failure(attempt, reason):
     Handles payout failure, schedules dunning/retry.
     """
     transaction = attempt.transaction
+    sentry_sdk.set_tag("transaction_id", transaction.sqid)
+    sentry_sdk.set_tag("attempt_id", attempt.sqid)
+    sentry_sdk.set_tag("attempt_number", attempt.attempt_number)
     
     with db_transaction.atomic():
         attempt.status = DunningAttempt.Status.FAILED
@@ -152,6 +159,8 @@ def handle_payout_failure(attempt, reason):
 
 def schedule_next_payout_attempt(failed_attempt):
     transaction = failed_attempt.transaction
+    sentry_sdk.set_tag("transaction_id", transaction.sqid)
+    # Note: failed_attempt is not the new attempt, so don't tag attempt_id/number of the new one yet
     
     next_attempt_number = failed_attempt.attempt_number + 1
     
