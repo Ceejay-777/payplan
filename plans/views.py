@@ -32,7 +32,7 @@ class ResolveBankView(generics.GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        resolution_data = resolve_and_cache_bank_account(request.user, serializer.validated_data)
+        resolution_data = resolve_and_cache_bank_account(serializer.validated_data)
         
         return Response({"data": serializer(resolution_data).data, "detail": "Bank account resolved successfully", "status": "success"}, status=status.HTTP_200_OK)
     
@@ -66,6 +66,7 @@ class CreateLinkFundedPayPlan(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        validated_data.pop("payment_link_token")
         
         plan, resolution_link = initialize_link_funded_plan(validated_data)
         

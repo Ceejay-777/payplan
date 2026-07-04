@@ -21,7 +21,7 @@ BANK_RESOLUTION_TTL = 300 # 5 minutes
 BASE_URL = settings.BASE_URL
 PAYMENT_LINK_EXPIRY_MINUTES = settings.PAYMENT_LINK_EXPIRY_MINUTES
 
-def _log_plan_event(plan, event_type, previous_status, new_status, metadata=None):
+def _log_plan_event(plan, event_type, new_status, previous_status=None, metadata=None):
     event = PayPlanEvent.objects.create(
         plan=plan,
         event_type=event_type,
@@ -33,10 +33,6 @@ def _log_plan_event(plan, event_type, previous_status, new_status, metadata=None
     return event
 
 def resolve_and_cache_bank_account(resolution_data):
-    """
-    Resolve a bank account via Nomba, cache the result tied to this user,
-    and return a one-time token the client must pass back at plan creation.
-    """
     account_number = resolution_data['account_number']
     bank_code = resolution_data['bank_code']
     account_name = resolve_bank_account(account_number, bank_code)
@@ -78,13 +74,13 @@ def create_self_funded_plan(creator, validated_data):
     resolution_token = validated_data.pop('resolution_token')
     receiver_bank_details = use_bank_resolution(resolution_token)
     
+    # Check/Create sub-engine customer
+    if not creator.sub_engine_customer_id:
+        customer_id = create_customer(creator)
+        creator.sub_engine_customer_id = customer_id
+        creator.save(update_fields=['sub_engine_customer_id'])
+    
     with transaction.atomic():
-        # Check/Create sub-engine customer
-        if not creator.sub_engine_customer_id:
-            customer_id = create_customer(creator)
-            creator.sub_engine_customer_id = customer_id
-            creator.save(update_fields=['sub_engine_customer_id'])
-        
         # Create plan
         plan = PayPlan.objects.create(
             creator=creator,
@@ -96,19 +92,14 @@ def create_self_funded_plan(creator, validated_data):
             payer_email=creator.email,
             **validated_data
         )
-        
-        # Create sub-engine plan
-        sub_engine_plan_id = create_sub_engine_plan(plan)
-        
-        # Create subscription
-        sub_engine_response = create_subscription(creator.sub_engine_customer_id, sub_engine_plan_id)
-        
-        plan.subscription_engine_id = sub_engine_response["id"]
-        plan.order_reference = sub_engine_response.get("order_reference", "")
-        
-        plan.save(update_fields=['subscription_engine_id', 'order_reference', 'status'])
-        
         _log_plan_event(plan=plan, event_type=PayPlanEvent.EventTypes.PLAN_CREATED, new_status=plan.status)
+        
+    sub_engine_plan_id = create_sub_engine_plan(plan)
+    sub_engine_response = create_subscription(creator.sub_engine_customer_id, sub_engine_plan_id)
+    
+    plan.subscription_engine_id = sub_engine_response["id"]
+    plan.order_reference = sub_engine_response.get("order_reference", "")
+    plan.save(update_fields=['subscription_engine_id', 'order_reference'])
         
     return plan, sub_engine_response.get("checkout_link", "")
 
@@ -116,7 +107,7 @@ def initialize_link_funded_plan(validated_data):
     resolution_token = validated_data.pop('resolution_token')
     receiver_bank_details = use_bank_resolution(resolution_token)
     
-    payment_link_token = generate_unique_token(),
+    payment_link_token = generate_unique_token()
     
     plan = PayPlan.objects.create(
             receiver_account_name=receiver_bank_details["account_name"],
@@ -134,30 +125,31 @@ def initialize_link_funded_plan(validated_data):
     return plan, resolution_link
 
 def resolve_link_funded_plan(plan, payer_email):
-    guest_user = User.objects.get(email=payer_email)
-    
-    if not guest_user:
-        # TODO: Send OTP to confirm email
-        guest_user = User.objects.create(email=payer_email, role=User.Role.GUEST)
+    guest_user, created = User.objects.get_or_create(
+        email=payer_email,
+        defaults={"role": User.Role.GUEST},
+    )
+    if created:
+        pass  # TODO: Send OTP to confirm email
         
     if not guest_user.sub_engine_customer_id:
         customer_id = create_customer(guest_user)
         guest_user.sub_engine_customer_id = customer_id
         guest_user.save(update_fields=['sub_engine_customer_id'])
-        
     
     sub_engine_plan_id = create_sub_engine_plan(plan)
     sub_engine_response = create_subscription(guest_user.sub_engine_customer_id, sub_engine_plan_id)
-    
-    previous_status = plan.status
-    plan.creator = guest_user
-    plan.subscription_engine_id = sub_engine_response["id"]
-    plan.order_reference = sub_engine_response.get("order_reference", "")
-    plan.status = PayPlan.Status.AWAITING_FUNDING
-    
-    plan.save(update_fields=['creator', 'subscription_engine_id', 'order_reference', 'status'])
-    
-    _log_plan_event(plan=plan, event_type=PayPlanEvent.EventTypes.PLAN_CREATED, previous_status=previous_status, new_status=plan.status)
+        
+    with transaction.atomic():
+        previous_status = plan.status
+        plan.creator = guest_user
+        plan.subscription_engine_id = sub_engine_response["id"]
+        plan.order_reference = sub_engine_response.get("order_reference", "")
+        plan.status = PayPlan.Status.AWAITING_FUNDING
+        
+        plan.save(update_fields=['creator', 'subscription_engine_id', 'order_reference', 'status'])
+        
+        _log_plan_event(plan=plan, event_type=PayPlanEvent.EventTypes.PLAN_CREATED, previous_status=previous_status, new_status=plan.status)
     
     return plan, sub_engine_response.get("checkout_link", "")
 

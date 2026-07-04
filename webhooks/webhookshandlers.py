@@ -8,12 +8,20 @@ from transactions.services import create_and_run_first_payout_attempt
 import sentry_sdk
 
 def handle_subscription_activated(data):
+    sub_engine_id = data.get('subscription_id')
     try:
-        sub_engine_id = data.get('subscription_id')
-        plan = PayPlan.objects.select_for_update().get(engine_subscription_id=sub_engine_id)
-        
-        # Update plan with engine data
-        activate_plan(plan)
+        with transaction.atomic():
+            plan = PayPlan.objects.select_for_update().get(engine_subscription_id=sub_engine_id)
+            
+            if plan.status == PayPlan.Status.ACTIVE:
+                sentry_sdk.logger.info(
+                    "Subscription activated already handled for plan {plan_id}",
+                    plan_id=plan.id,
+                )
+                return
+            
+            # Update plan with engine data
+            activate_plan(plan, data)
         
         sentry_sdk.logger.info(
             "Subscription activated for plan {plan_id} with engine subscription ID {sub_engine_id}",
@@ -99,7 +107,7 @@ def handle_billing_success(data):
         raise
     
     # Start payout process to the receiver account
-    create_and_run_first_payout_attempt(plan, transaction_record)
+    create_and_run_first_payout_attempt(transaction_record)
 
 
 # def handle_billing_failed(data):

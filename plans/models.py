@@ -1,4 +1,6 @@
 from django.db import models
+from django.core.exceptions import ValidationError
+
 from django.utils import timezone
 from payplan.models import BaseModel
 from core.models import User
@@ -57,9 +59,9 @@ class PayPlan(BaseModel):
     
     def save(self, *args, **kwargs):
         if (self.status != self.Status.DRAFT) and not self.creator:
-            #TODO: raise validation error
-            pass
-        
+            raise ValidationError(
+                "PayPlan cannot leave DRAFT status without a creator assigned."
+            )
         super().save(*args, **kwargs)
     
 class PayPlanEvent(models.Model):

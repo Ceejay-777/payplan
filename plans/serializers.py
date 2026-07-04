@@ -53,7 +53,7 @@ class CreatePayPlanSerializer(StrictFieldsMixin, serializers.ModelSerializer):
 class ResolveLinkFundedPayPlanSerializer(serializers.Serializer):
     payer_email = serializers.EmailField(required=True)
     plan = serializers.SlugRelatedField(queryset=PayPlan.objects.filter(status=PayPlan.Status.DRAFT), slug_field='sqid', required=True)
-    payment_link_token = serializers.CharField(read_only=True)
+    payment_link_token = serializers.CharField(write_only=True)
     
     def validate(self, attrs):
         plan = attrs.get("plan")
@@ -61,16 +61,16 @@ class ResolveLinkFundedPayPlanSerializer(serializers.Serializer):
         payment_link_expires_at = plan.payment_link_expires_at
         
         if payment_link_token != plan.payment_link_token:
-            #TODO: Raise error
-            pass 
-        
-        if payment_link_expires_at > timezone.now():
-            #TODO: Raise error
-            pass
+            raise serializers.ValidationError(
+                {"payment_link_token": "This payment link is invalid or has expired"}
+            )
+
+        if payment_link_expires_at < timezone.now():
+            raise serializers.ValidationError(
+                {"payment_link_token": "This payment link is invalid or has expired"}
+            )
         
         return attrs
-        
-        
 
 class CancellationRequestSerializer(serializers.ModelSerializer):
     class Meta:
