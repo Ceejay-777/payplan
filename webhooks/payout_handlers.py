@@ -36,7 +36,6 @@ def handle_payout_refund(data):
     try:
         with db_transaction.atomic():
             attempt = DunningAttempt.objects.select_for_update().get(payout_reference=payout_reference)
-            transaction = attempt.transaction
 
             if attempt.status in (DunningAttempt.Status.SUCCESS, DunningAttempt.Status.FAILED):
                 sentry_sdk.logger.info(
@@ -46,7 +45,7 @@ def handle_payout_refund(data):
                 return
 
             reason = data.get('reason', 'Unknown reason')
-            handle_payout_failure(transaction, attempt, reason)
+            handle_payout_failure(attempt, reason)
 
     except DunningAttempt.DoesNotExist:
         sentry_sdk.logger.error(

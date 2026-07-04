@@ -91,7 +91,7 @@ def initiate_payout(attempt):
             #TODO: Get actual payout reference
             attempt.payout_reference = payout_data.get('id')
             attempt.status = DunningAttempt.Status.AWAITING_CONFIRMATION
-            attempt.save(update_fields=['merchant_tx_ref', 'payout_reference', 'status'])
+            attempt.save(update_fields=['payout_reference', 'status'])
             
             previous_status = transaction.status
             transaction.status = Transaction.Status.PAYOUT_PENDING
@@ -107,7 +107,7 @@ def initiate_payout(attempt):
         
     except NombaTransferRejected as e:
         sentry_sdk.logger.error(f"Payout rejected for transaction {transaction.sqid}: {e}")
-        handle_payout_failure(transaction, str(e))
+        handle_payout_failure(attempt, str(e))
         raise
 
     except NombaConnectionError as e:
@@ -121,10 +121,12 @@ def initiate_payout(attempt):
         )
         raise
 
-def handle_payout_failure(transaction, reason, attempt):
+def handle_payout_failure(attempt, reason):
     """
     Handles payout failure, schedules dunning/retry.
     """
+    transaction = attempt.transaction
+    
     with db_transaction.atomic():
         attempt.status = DunningAttempt.Status.FAILED
         attempt.failure_reason = reason

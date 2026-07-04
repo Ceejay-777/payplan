@@ -14,12 +14,12 @@ def run_payout_retry(dunning_attempt_id):
         )
         raise  
     
-    transaction = attempt.transaction
-    initiate_payout(attempt)
-    
     attempt.attempted_at = timezone.now()
     attempt.status = DunningAttempt.Status.AWAITING_CONFIRMATION
-    attempt.save(update_fields=['status'])
+    attempt.save(update_fields=['status', 'attempted_at'])
+    
+    transaction = attempt.transaction
+    initiate_payout(attempt)
     
     sentry_sdk.logger.info(
         "Payout retry accepted by Nomba, awaiting webhook confirmation",
