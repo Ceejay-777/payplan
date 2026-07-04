@@ -8,7 +8,7 @@ class TransactionSerializer(serializers.ModelSerializer):
         model = Transaction
         fields = [
             'sqid', 'plan', 'plan_title', 'amount', 'currency', 
-            'status', 'nomba_reference', 'failure_reason', 
+            'status', 'charge_reference', 'payout_reference', 'failure_reason', 
             'billing_cycle_number', 'charged_at', 'created_at'
         ]
         read_only_fields = fields

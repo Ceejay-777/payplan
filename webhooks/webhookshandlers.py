@@ -2,7 +2,8 @@ from django.db import transaction
 from plans.models import PayPlan
 from plans.services import activate_plan, update_plan_for_charge
 from transactions.services import record_transaction, schedule_dunning
-from transactions.models import Transaction
+from transactions.models import Transaction, TransactionEvent
+from transactions.services import initiate_payout
 
 import sentry_sdk
 
@@ -28,27 +29,45 @@ def handle_subscription_activated(data):
             "Subscription activate failed: record not found for {sub_engine_id}",
             sub_engine_id=sub_engine_id,
         )
+        raise
     except Exception as e:
         sentry_sdk.logger.error(
             "Subscription activate failed: {error}",
             error=str(e),
         )
+        raise
 
 def handle_billing_success(data):
+    sub_engine_id = data.get('subscription_id')
+    
     try:
         with transaction.atomic():
-            sub_engine_id = data.get('subscription_id')
             plan = PayPlan.objects.select_for_update().get(engine_subscription_id=sub_engine_id)
             
-            # TODO: Check it transaction exists for the plan using an idempotency key. Probably get billing count from engine.
+            # Idempotency check: check if transaction exists for this plan and cycle
+            cycle_number = plan.billing_count + 1
+            existing_transaction = Transaction.objects.filter(
+                plan=plan, 
+                billing_cycle_number=cycle_number,
+                charge_reference=data.get('reference')
+            ).exists()
             
+            if existing_transaction:
+                sentry_sdk.logger.info(
+                    "Billing success already handled for plan {plan_id} and cycle {cycle}",
+                    plan_id=plan.id,
+                    cycle=cycle_number
+                )
+                return
+
             # Record successful transaction or update existing one
-            record_transaction(
+            transaction_record = record_transaction(
                 plan=plan,
-                nomba_reference=data.get('reference'),
+                charge_reference=data.get('reference'),
                 amount=plan.amount,
-                cycle_number=plan.billing_count + 1,
-                status=Transaction.Status.CHARGE_SUCCESS
+                cycle_number=cycle_number,
+                status=Transaction.Status.CHARGE_SUCCESS,
+                event_type=TransactionEvent.EventTypes.CHARGE_SUCCEEDED
             )
             
             # Update plan for next billing cycle
@@ -68,23 +87,28 @@ def handle_billing_success(data):
             "Billing resolution failed: record not found for {sub_engine_id}",
             sub_engine_id=sub_engine_id,
         )
+        raise
     except Exception as e:
         sentry_sdk.logger.error(
             "Billing resolution failed: {error}",
             error=str(e),
         )
+        raise
+    
+    # Start payout process to the receiver account
+    initiate_payout(plan, transaction_record)
 
 
 def handle_billing_failed(data):
     try:
         with transaction.atomic():
-            engine_id = data.get('subscription_id')
-            plan = PayPlan.objects.get(engine_subscription_id=engine_id)
+            sub_engine_id = data.get('subscription_id')
+            plan = PayPlan.objects.select_for_update().get(engine_subscription_id=sub_engine_id)
             
             # Record failed transaction
             transaction_record = record_transaction(
                 plan=plan,
-                nomba_reference=data.get('reference'),
+                charge_reference=data.get('reference'),
                 amount=plan.amount,
                 cycle_number=plan.billing_count + 1,
                 status=Transaction.Status.FAILED,

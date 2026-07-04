@@ -8,7 +8,7 @@ class Transaction(BaseModel):
         CHARGE_SUCCESS = "CHARGE_SUCCESS", "Charge Success"
         CHARGE_FAILED = "CHARGE_FAILED", "Charge Failed"
         
-        PAYOUT_PENDING = "PAYOUT_PENDING", "Payout Pending" # Same with CHARGE_SUCCESS
+        PAYOUT_PENDING = "PAYOUT_PENDING", "Payout Pending" 
         PAYOUT_SUCCESS = "PAYOUT_SUCCESS", "Payout Success"
         PAYOUT_FAILED = "PAYOUT_FAILED", "Payout Failed"
         
@@ -17,8 +17,14 @@ class Transaction(BaseModel):
     plan = models.ForeignKey(PayPlan, on_delete=models.CASCADE, related_name='transactions')
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(max_length=3, default='NGN')
+    
     status = models.CharField(choices=Status.choices, max_length=20, default=Status.CHARGE_PENDING)
-    nomba_reference = models.CharField(max_length=255, null=True, blank=True)
+    charge_reference = models.CharField(max_length=255, null=True, blank=True)
+    payout_reference = models.CharField(max_length=255, null=True, blank=True)
+    
+    max_payout_attempts = models.IntegerField(default=3)
+    payout_failure_reason = models.TextField(null=True, blank=True)
+    
     failure_reason = models.TextField(null=True, blank=True)
     billing_cycle_number = models.IntegerField()
     charged_at = models.DateTimeField(null=True, blank=True)
@@ -29,7 +35,7 @@ class Transaction(BaseModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["plan", "billing_cycle_number", "nomba_reference"],
+                fields=["plan", "billing_cycle_number", "charge_reference"],
                 name="unique_transaction_per_plan_cycle",
             )
         ]

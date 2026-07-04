@@ -1,6 +1,7 @@
 import json
 import hashlib
 import hmac
+import base64
 
 from drf_spectacular.utils import extend_schema
 import sentry_sdk
@@ -19,11 +20,20 @@ from .webhookshandlers import (
     handle_subscription_activated
 )
 
+from .payout_handlers import handle_payout_success, handle_payout_failed, handle_payout_refund
+
 sub_engine_api_key = settings.SUB_ENGINE_API_KEY
+nomba_webhook_secret = settings.NOMBA_WEBHOOK_SECRET
 
 EVENT_HANDLERS = {
     "subscription.activated": handle_subscription_activated,
     "payment.succeeded": handle_billing_success,
+}
+
+NOMBA_EVENT_HANDLERS = {
+    "payout_success": handle_payout_success,
+    "payout_failed": handle_payout_failed,
+    "payout_refund": handle_payout_refund,
 }
 
 @extend_schema(exclude=True)
@@ -35,8 +45,10 @@ class EngineWebhookView(APIView):
         payload = request.body
         signature = request.headers.get('X-PayPlan-Signature')
         
-        self.verify_signature(payload, signature)
-            
+        verification_result = self.verify_signature(payload, signature)
+        if verification_result is not True:
+            return verification_result
+
         try:
             event = json.loads(payload)
             event_type = event.get('event')
@@ -50,7 +62,7 @@ class EngineWebhookView(APIView):
                 handler(data)
                 sentry_sdk.logger.info("Sub engine webhook handled: {event_type}", event_type=event_type,)
                 
-            return HttpResponse(status=status.HTTP_200)
+            return Response({"detail": "Sub engine webhook processed"},status=status.HTTP_200_OK)
         
         except Exception as e:
             sentry_sdk.logger.error(
@@ -58,7 +70,7 @@ class EngineWebhookView(APIView):
                 exc_info=True,
                 extra={"payload": payload.decode('utf-8'), "signature": signature}
             )
-            return Response({"detail": "Error processing sub engine webhook"}, status=status.HTTP_500)
+            return Response({"detail": "Error processing sub engine webhook"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def verify_signature(self, payload, signature):
         hashed = hmac.new(
@@ -73,9 +85,102 @@ class EngineWebhookView(APIView):
                 attributes={"provided_signature": signature or "missing", "payload": payload.decode('utf-8')},
             )
             
-            return Response({"detail": "Invalid signature"}, status=status.HTTP_403)
+            return Response({"detail": "Invalid signature"}, status=status.HTTP_403_FORBIDDEN)
         
-        # secret = settings.ENGINE_WEBHOOK_SECRET.encode()
-        # expected = hmac.new(secret, payload, hashlib.sha256).hexdigest()
-        # return hmac.compare_digest(expected, signature)
+        return True
+    
+@extend_schema(exclude=True)
+class NombaWebhookView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        payload = request.body
+        signature = request.headers.get('nomba-signature')
+        timestamp = request.headers.get('nomba-timestamp')
+
+        verify_result = self.verify_signature(payload, signature, timestamp)
+        if verify_result is not True:
+            return verify_result
+
+        try:
+            event = json.loads(payload)
+            event_type = event.get('event_type')
+            data = event.get('data')
+
+            handler = NOMBA_EVENT_HANDLERS.get(event_type)
+
+            if handler is None:
+                sentry_sdk.logger.warning(
+                    "Unhandled Nomba webhook event type: {event_type}",
+                    event_type=event_type,
+                )
+            else:
+                handler(data)
+                sentry_sdk.logger.info(
+                    "Nomba webhook handled: {event_type}",
+                    event_type=event_type,
+                )
+
+            return Response({"detail": "Nomba webhook processed"}, status=status.HTTP_200_OK)
+
+        except Exception:
+            sentry_sdk.logger.error(
+                "Error processing Nomba webhook",
+                exc_info=True,
+                attributes={"payload": payload.decode('utf-8'), "signature": signature},
+            )
+            return Response(
+                {"detail": "Error processing Nomba webhook"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def verify_signature(self, payload, signature, timestamp):
+        if not signature or not timestamp:
+            sentry_sdk.logger.warning(
+                "Nomba webhook missing signature or timestamp",
+                attributes={"signature": signature or "missing", "timestamp": timestamp or "missing"},
+            )
+            return Response({"detail": "Invalid signature"}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            event = json.loads(payload)
+        except (json.JSONDecodeError, TypeError):
+            sentry_sdk.logger.warning("Nomba webhook payload not valid JSON")
+            return Response({"detail": "Invalid payload"}, status=status.HTTP_400_BAD_REQUEST)
+
+        data = event.get('data', {})
+        merchant = data.get('merchant', {})
+        transaction = data.get('transaction', {})
+
+        response_code = transaction.get('responseCode', '')
+        if response_code == "null":
+            response_code = ""
+
+        hashing_payload = ":".join([
+            event.get('event_type', ''),
+            event.get('requestId', ''),
+            merchant.get('userId', ''),
+            merchant.get('walletId', ''),
+            transaction.get('transactionId', ''),
+            transaction.get('type', ''),
+            transaction.get('time', ''),
+            response_code,
+            timestamp,
+        ])
+
+        expected = hmac.new(
+            nomba_webhook_secret.encode(),
+            hashing_payload.encode(),
+            hashlib.sha256,
+        ).digest()
+        expected_b64 = base64.b64encode(expected).decode()
+
+        if not hmac.compare_digest(expected_b64.lower(), signature.lower()):
+            sentry_sdk.logger.warning(
+                "Nomba webhook signature validation failed",
+                attributes={"provided_signature": signature, "payload": payload.decode('utf-8')},
+            )
+            return Response({"detail": "Invalid signature"}, status=status.HTTP_403_FORBIDDEN)
+
         return True

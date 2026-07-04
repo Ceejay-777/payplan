@@ -1,51 +1,35 @@
 from .models import Transaction, DunningAttempt
-from .services import record_transaction, handle_dunning_failure
+from .services import record_transaction, handle_payout_retry_failure, initiate_payout
 from django.utils import timezone
-import requests
+import sentry_sdk
 
-def run_dunning_attempt(dunning_attempt_id):
+def run_payout_retry(dunning_attempt_id):
     """
-    Background task to run a dunning attempt.
+    Background task to retry a failed payout.
     """
     try:
-        attempt = DunningAttempt.objects.get(id=dunning_attempt_id)
+        attempt = DunningAttempt.objects.get(sqid=dunning_attempt_id)
+        transaction = attempt.transaction
+        
+        attempt.attempted_at = timezone.now()
+        
+        initiate_payout(transaction.plan, transaction)
+        
+        #TODO: If success, mark attempt as success - Do this in webhook?
+        attempt.status = DunningAttempt.Status.SUCCESS
+        attempt.save(update_fields=['status', 'attempted_at'])
+        
+        sentry_sdk.logger.info(f"Payout retry successful for transaction {transaction.sqid} on attempt {attempt.attempt_number}")
+        
     except DunningAttempt.DoesNotExist:
-        return
-
-    plan = attempt.transaction.plan
-    payer_card = plan.payer_card
+        sentry_sdk.logger.error("Payout retry failed: dunning attempt not found", extra={"dunning_attempt_id": dunning_attempt_id})
+        raise
     
-    if not payer_card:
+    except Exception as e:
         attempt.status = DunningAttempt.Status.FAILED
-        attempt.failure_reason = "No payer card attached to plan"
-        attempt.save()
-        handle_dunning_failure(attempt)
-        return
-
-    # Call Nomba Charge API (stubbed logic)
-    # try:
-    #     response = call_nomba_charge_api(payer_card.nomba_token, plan.amount)
-    #     if response.success:
-    #         attempt.status = DunningAttempt.Status.SUCCESS
-    #         attempt.save()
-    #         # Record new successful transaction
-    #         record_transaction(plan, response.reference, plan.amount, attempt.transaction.billing_cycle_number, Transaction.Status.SUCCESS)
-    #         # Update plan
-    #         plan.billing_count += 1
-    #         plan.save()
-    #     else:
-    #         attempt.status = DunningAttempt.Status.FAILED
-    #         attempt.failure_reason = response.error
-    #         attempt.save()
-    #         handle_dunning_failure(attempt)
-    # except Exception as e:
-    #     attempt.status = DunningAttempt.Status.FAILED
-    #     attempt.failure_reason = str(e)
-    #     attempt.save()
-    #     handle_dunning_failure(attempt)
-
-    # Simplified stub for success/failure
-    attempt.attempted_at = timezone.now()
-    attempt.status = DunningAttempt.Status.FAILED # Assume it still fails for now
-    attempt.save()
-    handle_dunning_failure(attempt)
+        attempt.failure_reason = str(e)
+        attempt.save(update_fields=['status', 'failure_reason'])
+        
+        handle_payout_retry_failure(attempt)
+        
+        sentry_sdk.logger.error(f"Payout retry failed: {e}", extra={"dunning_attempt_id": dunning_attempt_id})
