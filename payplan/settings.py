@@ -157,15 +157,23 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+redis_config = urlparse(REDIS_URL)
+
 Q_CLUSTER = {
-    'name': 'PayPlanQueue',
-    'workers': 4,
-    'recycle': 500,
-    'timeout': 60,
-    'compress': True,
-    'cpu_affinity': 1,
-    'label': 'Django Q',
-    'orm': 'default'
+    "name": "payplan",
+    "workers": 2,
+    "timeout": 90,
+    "retry": 120,
+    "queue_limit": 50,
+    "bulk": 10,
+    "orm": None,  # explicitly not using ORM broker — using redis below
+    "redis": {
+        "host": redis_config.hostname,
+        "port": redis_config.port,
+        "password": redis_config.password,
+        "db": int(redis_config.path.lstrip("/") or 0),
+    },
 }
 
 DJANGO_SQIDS_MIN_LENGTH = 7
