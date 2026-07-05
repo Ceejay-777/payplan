@@ -216,7 +216,15 @@ if SENTRY_DSN:
         environment=os.environ.get("ENVIRONMENT", "production"),
     )
 
-NOMBA_WEBHOOK_SECRET = os.environ.get("NOMBA_WEBHOOK_SECRET")  
+NOMBA_WEBHOOK_SECRET = os.environ.get("NOMBA_WEBHOOK_SECRET")
 SUB_ENGINE_API_KEY = os.environ.get('SUB_ENGINE_API_KEY')
+
+NOMBA_LIVE_BASE_URL = os.environ.get("NOMBA_LIVE_BASE_URL", "https://api.nomba.com")
+NOMBA_TEST_BASE_URL = os.environ.get("NOMBA_TEST_BASE_URL", "https://sandbox.nomba.com")
+NOMBA_LIVE_CLIENT_ID = os.environ.get("NOMBA_LIVE_CLIENT_ID")
+NOMBA_LIVE_PRIVATE_KEY = os.environ.get("NOMBA_LIVE_PRIVATE_KEY")
+NOMBA_TEST_CLIENT_ID = os.environ.get("NOMBA_TEST_CLIENT_ID")
+NOMBA_TEST_PRIVATE_KEY = os.environ.get("NOMBA_TEST_PRIVATE_KEY")
+NOMBA_ACCOUNT_ID = os.environ.get("NOMBA_ACCOUNT_ID")
 BASE_URL = os.environ.get("BASE_URL", "http://127.0.0.1:8000/")
 PAYMENT_LINK_EXPIRY_MINUTES = 15
