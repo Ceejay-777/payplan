@@ -41,7 +41,7 @@ class TestPlans(TestCase):
         
         self.assertEqual(plan.status, PayPlan.Status.AWAITING_FUNDING)
         self.assertEqual(plan.creator, self.user)
-        self.assertEqual(plan.subscription_engine_id, "sub_123")
+        self.assertEqual(plan.engine_subscription_id, "sub_123")
         self.assertEqual(plan.order_reference, "ref_123")
         self.assertEqual(link, "http://link.com")
 
@@ -109,7 +109,7 @@ class TestPlans(TestCase):
         self.assertEqual(plan.status, PayPlan.Status.AWAITING_FUNDING)
         self.assertEqual(plan.creator.email, "guest@example.com")
         self.assertEqual(plan.creator.role, 'GUEST')
-        self.assertEqual(plan.subscription_engine_id, "sub_123")
+        self.assertEqual(plan.engine_subscription_id, "sub_123")
         self.assertEqual(plan.order_reference, "ref_123")
 
     def test_activate_plan(self):
@@ -126,7 +126,7 @@ class TestPlans(TestCase):
 
         plan.refresh_from_db()
         self.assertEqual(plan.status, PayPlan.Status.ACTIVE)
-        self.assertEqual(plan.subscription_engine_id, "engine_sub_1")
+        self.assertEqual(plan.engine_subscription_id, "engine_sub_1")
 
 
     def test_update_plan_for_charge(self):

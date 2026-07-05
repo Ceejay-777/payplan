@@ -32,7 +32,7 @@ NOMBA_EVENT_HANDLERS = {
     "payout_refund": handle_payout_refund,
 }
 
-@extend_schema(exclude=True)
+# @extend_schema(exclude=True)
 class EngineWebhookView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
@@ -85,7 +85,8 @@ class EngineWebhookView(APIView):
         
         return True
     
-@extend_schema(exclude=True)
+# @extend_schema(exclude=True)
+# @extend_schema(tags=["Webhooks"])
 class NombaWebhookView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]

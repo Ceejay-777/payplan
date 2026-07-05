@@ -97,9 +97,9 @@ def create_self_funded_plan(creator, validated_data):
     sub_engine_plan_id = create_sub_engine_plan(plan)
     sub_engine_response = create_subscription(creator.sub_engine_customer_id, sub_engine_plan_id)
     
-    plan.subscription_engine_id = sub_engine_response["id"]
+    plan.engine_subscription_id = sub_engine_response["id"]
     plan.order_reference = sub_engine_response.get("order_reference", "")
-    plan.save(update_fields=['subscription_engine_id', 'order_reference'])
+    plan.save(update_fields=['engine_subscription_id', 'order_reference'])
         
     return plan, sub_engine_response.get("checkout_link", "")
 
@@ -143,11 +143,11 @@ def resolve_link_funded_plan(plan, payer_email):
     with transaction.atomic():
         previous_status = plan.status
         plan.creator = guest_user
-        plan.subscription_engine_id = sub_engine_response["id"]
+        plan.engine_subscription_id = sub_engine_response["id"]
         plan.order_reference = sub_engine_response.get("order_reference", "")
         plan.status = PayPlan.Status.AWAITING_FUNDING
         
-        plan.save(update_fields=['creator', 'subscription_engine_id', 'order_reference', 'status'])
+        plan.save(update_fields=['creator', 'engine_subscription_id', 'order_reference', 'status'])
         
         _log_plan_event(plan=plan, event_type=PayPlanEvent.EventTypes.PLAN_CREATED, previous_status=previous_status, new_status=plan.status)
     

@@ -22,6 +22,8 @@ def nomba_request(method, endpoint, payload=None, timeout=10):
         sentry_sdk.logger.error("Nomba request failed", attributes={"error": str(e), "endpoint": endpoint, "payload": payload})
         raise 
     
+# def 
+    
 def sub_engine_request(method, endpoint, payload=None, timeout=10):
     """
     Helper function to make requests to the Sub-Engine API.
