@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
@@ -13,7 +14,8 @@ from payplan.views import PublicGenericAPIView
 from .models import PayPlan, CancellationRequest
 from .serializers import (
     PayPlanSerializer, CreatePayPlanSerializer, ConfirmCancellationSerializer,
-    ResolveBankSerializer, CreatePayPlanReadSerializer, ResolveLinkFundedPayPlanSerializer
+    ResolveBankSerializer, CreatePayPlanReadSerializer,
+    ResolveLinkFundedPayPlanSerializer, PlanDetailSerializer,
 )
 from .services import (
     create_self_funded_plan, initialize_link_funded_plan,
@@ -79,15 +81,47 @@ class CreateLinkFundedPayPlan(generics.CreateAPIView):
             status=status.HTTP_201_CREATED
         )
 @extend_schema(tags=["Plans"])
+class PlanDetailsViaLinkView(PublicGenericAPIView, generics.GenericAPIView):
+    serializer_class = PlanDetailSerializer
+
+    def get(self, request, *args, **kwargs):
+        plan_sqid = request.query_params.get('p')
+        payment_link_token = request.query_params.get('plt')
+
+        if not plan_sqid or not payment_link_token:
+            return Response(
+                {"detail": "Missing plan reference or token", "status": "error"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        plan = get_object_or_404(
+            PayPlan,
+            sqid=plan_sqid,
+            payment_link_token=payment_link_token,
+            status=PayPlan.Status.DRAFT,
+        )
+
+        if plan.payment_link_expires_at and plan.payment_link_expires_at < timezone.now():
+            return Response(
+                {"detail": "This payment link has expired", "status": "error"},
+                status=status.HTTP_410_GONE,
+            )
+
+        serializer = self.get_serializer(plan)
+        return Response({"data": serializer.data, "status": "success"})
+
+@extend_schema(tags=["Plans"])
 class ResolveLinkFundedPayPlanView(PublicGenericAPIView, generics.GenericAPIView):
     serializer_class = ResolveLinkFundedPayPlanSerializer
 
-    def post(self, request, token, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        
-        plan, resolution_link = resolve_link_funded_plan(**validated_data)
+
+        plan = validated_data['plan']
+        payer_email = validated_data['payer_email']
+        plan, resolution_link = resolve_link_funded_plan(plan, payer_email)
         return Response(
             {
                 "data": {"plan": PayPlanSerializer(plan).data, "resolution_link": resolution_link},

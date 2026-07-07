@@ -14,6 +14,8 @@ urlpatterns = [
     path('api/plans/',        include('plans.urls')),
     path('api/transactions/', include('transactions.urls')),
     path('api/webhooks/',     include('webhooks.urls')),
+    path('api/cohorts/',      include('cohorts.urls')),
+    path('api/bank-accounts/', include('cohorts.bank_urls')),
     
     # Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

@@ -50,10 +50,40 @@ class CreatePayPlanSerializer(StrictFieldsMixin, serializers.ModelSerializer):
         
         return attrs
     
+class PlanDetailSerializer(serializers.ModelSerializer):
+    cohort_name = serializers.SerializerMethodField()
+    cohort_description = serializers.SerializerMethodField()
+    cohort_visibility = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PayPlan
+        fields = [
+            'sqid', 'title', 'description', 'amount', 'currency',
+            'frequency', 'status', 'cohort_id',
+            'cohort_name', 'cohort_description', 'cohort_visibility',
+        ]
+        read_only_fields = fields
+
+    def get_cohort_name(self, obj):
+        if hasattr(obj, 'cohort_membership'):
+            return obj.cohort_membership.cohort.name
+        return None
+
+    def get_cohort_description(self, obj):
+        if hasattr(obj, 'cohort_membership'):
+            return obj.cohort_membership.cohort.description
+        return None
+
+    def get_cohort_visibility(self, obj):
+        if hasattr(obj, 'cohort_membership'):
+            return obj.cohort_membership.cohort.visibility
+        return None
+
 class ResolveLinkFundedPayPlanSerializer(serializers.Serializer):
     payer_email = serializers.EmailField(required=True)
     plan = serializers.SlugRelatedField(queryset=PayPlan.objects.filter(status=PayPlan.Status.DRAFT), slug_field='sqid', required=True)
     payment_link_token = serializers.CharField(write_only=True)
+    cohort_id = serializers.CharField(required=False, write_only=True)
     
     def validate(self, attrs):
         plan = attrs.get("plan")

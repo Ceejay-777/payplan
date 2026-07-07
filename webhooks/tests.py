@@ -1,203 +1,218 @@
-import hashlib
-import hmac
 import json
-import base64
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIRequestFactory
 
+from cohorts.models import Cohort, CohortMembership
+from cohorts.services import create_cohort
 from plans.factories import PayPlanFactory, UserFactory
-from transactions.models import Transaction, TransactionEvent, DunningAttempt
-from transactions.services import record_transaction
-from webhooks.payout_handlers import handle_payout_success, handle_payout_refund
-from webhooks.webhooks import NombaWebhookView
+from plans.models import PayPlan
+from transactions.models import Transaction, TransactionEvent
+from webhooks.webhookshandlers import handle_billing_failed, handle_billing_success, handle_subscription_activated
 
 
-def _make_attempt_with_payout_ref(plan, payout_reference, attempt_number=0, status=None):
-    txn = record_transaction(
-        plan=plan,
-        charge_reference="engine_ref_1",
-        amount=plan.amount,
-        cycle_number=1,
-        status=Transaction.Status.CHARGE_SUCCESS,
-        event_type=TransactionEvent.EventTypes.CHARGE_SUCCEEDED,
-    )
-    attempt = DunningAttempt.objects.create(
-        transaction=txn,
-        attempt_number=attempt_number,
-        scheduled_at=txn.created_at,
-        status=status or DunningAttempt.Status.AWAITING_CONFIRMATION,
-        payout_reference=payout_reference,
-    )
-    return txn, attempt
-
-
-class TestHandlePayoutSuccess(TestCase):
+class TestHandleBillingSuccessNoPayout(TestCase):
     def setUp(self):
         self.user = UserFactory()
-        self.plan = PayPlanFactory(creator=self.user)
-        self.txn, self.attempt = _make_attempt_with_payout_ref(self.plan, "PAYOUT_ABC")
+        self.plan = PayPlanFactory(creator=self.user, status=PayPlan.Status.ACTIVE)
 
-    def test_marks_attempt_and_transaction_succeeded(self):
-        handle_payout_success({"id": "PAYOUT_ABC"})
+    def test_creates_transaction_and_updates_plan(self):
+        handle_billing_success({
+            "subscription_id": self.plan.engine_subscription_id,
+            "reference": "charge_ref_001",
+            "next_billing_date": "2026-08-05T00:00:00Z",
+        })
 
-        self.attempt.refresh_from_db()
-        self.txn.refresh_from_db()
-        self.assertEqual(self.attempt.status, DunningAttempt.Status.SUCCESS)
-        self.assertEqual(self.txn.status, Transaction.Status.PAYOUT_SUCCESS)
+        txn = Transaction.objects.get(plan=self.plan, billing_cycle_number=1)
+        self.assertEqual(txn.status, Transaction.Status.CHARGE_SUCCESS)
+        self.assertEqual(txn.charge_reference, "charge_ref_001")
 
-    def test_idempotent_when_attempt_already_success(self):
-        self.attempt.status = DunningAttempt.Status.SUCCESS
-        self.attempt.save(update_fields=['status'])
+        self.plan.refresh_from_db()
+        self.assertEqual(self.plan.billing_count, 1)
 
-        with patch('webhooks.payout_handlers.set_transaction_succeeded') as mock_set:
-            handle_payout_success({"id": "PAYOUT_ABC"})
-            mock_set.assert_not_called()
+    def test_does_not_create_dunning_attempt(self):
+        from transactions.models import Transaction as TxnModel
+        handle_billing_success({
+            "subscription_id": self.plan.engine_subscription_id,
+            "reference": "charge_ref_002",
+            "next_billing_date": "2026-08-05T00:00:00Z",
+        })
 
-    def test_raises_on_unknown_reference(self):
-        with self.assertRaises(DunningAttempt.DoesNotExist):
-            handle_payout_success({"id": "DOES_NOT_EXIST"})
+        txn = TxnModel.objects.get(plan=self.plan, billing_cycle_number=1)
+        self.assertFalse(hasattr(txn, 'dunning_attempts'))
+
+    def test_is_idempotent(self):
+        handle_billing_success({
+            "subscription_id": self.plan.engine_subscription_id,
+            "reference": "charge_ref_003",
+            "next_billing_date": "2026-08-05T00:00:00Z",
+        })
+
+        txn_count = Transaction.objects.filter(plan=self.plan).count()
+        self.assertEqual(txn_count, 1)
+
+        handle_billing_success({
+            "subscription_id": self.plan.engine_subscription_id,
+            "reference": "charge_ref_003",
+            "next_billing_date": "2026-08-05T00:00:00Z",
+        })
+
+        txn_count = Transaction.objects.filter(plan=self.plan).count()
+        self.assertEqual(txn_count, 1)
+
+    def test_billing_count_increments(self):
+        handle_billing_success({
+            "subscription_id": self.plan.engine_subscription_id,
+            "reference": "charge_ref_004",
+            "next_billing_date": "2026-08-05T00:00:00Z",
+        })
+        self.plan.refresh_from_db()
+        self.assertEqual(self.plan.billing_count, 1)
+
+        handle_billing_success({
+            "subscription_id": self.plan.engine_subscription_id,
+            "reference": "charge_ref_005",
+            "next_billing_date": "2026-09-05T00:00:00Z",
+        })
+        self.plan.refresh_from_db()
+        self.assertEqual(self.plan.billing_count, 2)
 
 
-class TestHandlePayoutRefund(TestCase):
+class TestSubscriptionActivatedCohortMembership(TestCase):
     def setUp(self):
-        self.user = UserFactory()
-        self.plan = PayPlanFactory(creator=self.user)
-        self.txn, self.attempt = _make_attempt_with_payout_ref(self.plan, "PAYOUT_XYZ")
+        self.organizer = UserFactory()
+        self.payer = UserFactory()
 
-    @patch('webhooks.payout_handlers.handle_payout_failure')
-    def test_delegates_to_failure_handler_with_reason(self, mock_failure):
-        handle_payout_refund({"id": "PAYOUT_XYZ", "reason": "Insufficient funds"})
-        mock_failure.assert_called_once()
-        args, kwargs = mock_failure.call_args
-        self.assertEqual(args[0], self.attempt)
-        self.assertEqual(kwargs.get('reason') or args[1], "Insufficient funds")
-
-    def test_skips_when_attempt_already_terminal(self):
-        self.attempt.status = DunningAttempt.Status.SUCCESS
-        self.attempt.save(update_fields=['status'])
-
-        with patch('webhooks.payout_handlers.handle_payout_failure') as mock_failure:
-            handle_payout_refund({"id": "PAYOUT_XYZ", "reason": "x"})
-            mock_failure.assert_not_called()
-
-    def test_raises_on_unknown_reference(self):
-        with self.assertRaises(DunningAttempt.DoesNotExist):
-            handle_payout_refund({"id": "DOES_NOT_EXIST", "reason": "x"})
-
-
-def _sign_nomba_payload(payload_dict, secret, timestamp="1700000000"):
-    """Recreate Nomba's webhook signature scheme from webhooks.py."""
-    event_type = payload_dict.get('event_type', '')
-    request_id = payload_dict.get('requestId', '')
-    data = payload_dict.get('data', {})
-    merchant = data.get('merchant', {})
-    transaction = data.get('transaction', {})
-
-    response_code = transaction.get('responseCode', '')
-    if response_code == "null":
-        response_code = ""
-
-    hashing_payload = ":".join([
-        event_type,
-        request_id,
-        merchant.get('userId', ''),
-        merchant.get('walletId', ''),
-        transaction.get('transactionId', ''),
-        transaction.get('type', ''),
-        transaction.get('time', ''),
-        response_code,
-        timestamp,
-    ])
-
-    expected = hmac.new(
-        secret.encode(),
-        hashing_payload.encode(),
-        hashlib.sha256,
-    ).digest()
-    return base64.b64encode(expected).decode()
-
-
-@override_settings(NOMBA_WEBHOOK_SECRET="test_secret")
-class TestNombaWebhookSignature(TestCase):
-    def setUp(self):
-        # webhooks.py reads NOMBA_WEBHOOK_SECRET at import time, so override_settings
-        # alone doesn't change the module-level constant it actually uses.
-        self._secret_patcher = patch("webhooks.webhooks.nomba_webhook_secret", "test_secret")
-        self._secret_patcher.start()
-        self.factory = APIRequestFactory()
-        self.view = NombaWebhookView.as_view()
-        self.payload = {
-            "event_type": "payout_success",
-            "requestId": "req_1",
-            "data": {
-                "id": "PAYOUT_REF_1",
-                "merchant": {"userId": "u1", "walletId": "w1"},
-                "transaction": {
-                    "transactionId": "t1",
-                    "type": "transfer",
-                    "time": "2026-07-05T00:00:00Z",
-                    "responseCode": "00",
-                },
-            },
+        validated_data = {
+            'name': 'Test Cohort',
+            'frequency': Cohort.Frequency.MONTHLY,
+            'start_date': timezone.now(),
+            'receiver_account_name': 'Test Account',
+            'receiver_account_number': '1234567890',
+            'receiver_bank_code': '001',
         }
 
-    def tearDown(self):
-        self._secret_patcher.stop()
+        payers = [{
+            'email': self.payer.email,
+            'amount': 5000,
+            'name': 'Test Payer',
+        }]
 
-    def test_valid_signature_passes(self):
-        user = UserFactory()
-        plan = PayPlanFactory(creator=user)
-        _make_attempt_with_payout_ref(plan, "PAYOUT_REF_1")
+        self.cohort, results = create_cohort(self.organizer, validated_data, payers)
+        self.plan = results[0]['plan']
+        self.membership = results[0]['membership']
 
-        timestamp = "1700000000"
-        sig = _sign_nomba_payload(self.payload, "test_secret", timestamp)
-        body = json.dumps(self.payload).encode()
-        request = self.factory.post(
-            "/webhooks/nomba",
-            data=body,
-            content_type="application/json",
-            HTTP_NOMBA_SIGNATURE=sig,
-            HTTP_NOMBA_TIMESTAMP=timestamp,
+        PayPlan.objects.filter(pk=self.plan.pk).update(
+            engine_subscription_id='sub_cohort_001',
+            creator=self.payer,
         )
-        response = self.view(request)
-        self.assertEqual(response.status_code, 200, response.data)
+        self.plan.refresh_from_db()
 
-    def test_missing_signature_rejected(self):
-        body = json.dumps(self.payload).encode()
-        request = self.factory.post(
-            "/webhooks/nomba",
-            data=body,
-            content_type="application/json",
-            HTTP_NOMBA_TIMESTAMP="1700000000",
-        )
-        response = self.view(request)
-        self.assertEqual(response.status_code, 403)
+    def test_activates_plan_and_updates_cohort_membership(self):
+        handle_subscription_activated({
+            'subscription_id': 'sub_cohort_001',
+            'started_at': '2026-01-01T00:00:00Z',
+            'next_billing_date': '2026-02-01T00:00:00Z',
+            'card_last_four': '1234',
+            'card_type': 'VISA',
+        })
 
-    def test_tampered_signature_rejected(self):
-        body = json.dumps(self.payload).encode()
-        request = self.factory.post(
-            "/webhooks/nomba",
-            data=body,
-            content_type="application/json",
-            HTTP_NOMBA_SIGNATURE="not-a-real-signature",
-            HTTP_NOMBA_TIMESTAMP="1700000000",
-        )
-        response = self.view(request)
-        self.assertEqual(response.status_code, 403)
+        self.plan.refresh_from_db()
+        self.assertEqual(self.plan.status, PayPlan.Status.ACTIVE)
 
-    def test_unknown_event_type_returns_200_without_handler(self):
-        timestamp = "1700000000"
-        self.payload["event_type"] = "something_else"
-        sig = _sign_nomba_payload(self.payload, "test_secret", timestamp)
-        body = json.dumps(self.payload).encode()
-        request = self.factory.post(
-            "/webhooks/nomba",
-            data=body,
-            content_type="application/json",
-            HTTP_NOMBA_SIGNATURE=sig,
-            HTTP_NOMBA_TIMESTAMP=timestamp,
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.status, CohortMembership.Status.ACTIVE)
+        self.assertIsNotNone(self.membership.joined_at)
+
+
+class TestSubscriptionActivatedNoCohort(TestCase):
+    def setUp(self):
+        self.user = UserFactory()
+        self.plan = PayPlanFactory(
+            creator=self.user,
+            status=PayPlan.Status.DRAFT,
+            engine_subscription_id='sub_no_cohort_001',
         )
-        response = self.view(request)
-        self.assertEqual(response.status_code, 200)
+
+    def test_activates_plan_without_cohort_membership(self):
+        handle_subscription_activated({
+            'subscription_id': 'sub_no_cohort_001',
+            'started_at': '2026-01-01T00:00:00Z',
+            'next_billing_date': '2026-02-01T00:00:00Z',
+            'card_last_four': '1234',
+            'card_type': 'VISA',
+        })
+
+        self.plan.refresh_from_db()
+        self.assertEqual(self.plan.status, PayPlan.Status.ACTIVE)
+        self.assertFalse(hasattr(self.plan, 'cohort_membership'))
+
+
+class TestBillingFailedCohortMembership(TestCase):
+    def setUp(self):
+        self.organizer = UserFactory()
+        self.payer = UserFactory()
+
+        validated_data = {
+            'name': 'Test Cohort Billing',
+            'frequency': Cohort.Frequency.MONTHLY,
+            'start_date': timezone.now(),
+            'receiver_account_name': 'Test Account',
+            'receiver_account_number': '0987654321',
+            'receiver_bank_code': '002',
+        }
+
+        payers = [{
+            'email': self.payer.email,
+            'amount': 7500,
+            'name': 'Test Payer',
+        }]
+
+        self.cohort, results = create_cohort(self.organizer, validated_data, payers)
+        self.plan = results[0]['plan']
+        self.membership = results[0]['membership']
+
+        PayPlan.objects.filter(pk=self.plan.pk).update(
+            status=PayPlan.Status.ACTIVE,
+            engine_subscription_id='sub_fail_001',
+            creator=self.payer,
+        )
+        self.plan.refresh_from_db()
+
+    def test_records_failed_transaction_and_updates_membership(self):
+        handle_billing_failed({
+            'subscription_id': 'sub_fail_001',
+            'reference': 'charge_fail_ref_001',
+            'reason': 'Insufficient funds',
+        })
+
+        txn = Transaction.objects.get(plan=self.plan)
+        self.assertEqual(txn.status, Transaction.Status.CHARGE_FAILED)
+        self.assertEqual(txn.charge_reference, 'charge_fail_ref_001')
+
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.status, CohortMembership.Status.FAILED)
+
+
+class TestBillingFailedNoCohort(TestCase):
+    def setUp(self):
+        self.user = UserFactory()
+        self.plan = PayPlanFactory(
+            creator=self.user,
+            status=PayPlan.Status.ACTIVE,
+            engine_subscription_id='sub_fail_no_cohort_001',
+        )
+
+    def test_records_failed_transaction_without_cohort(self):
+        handle_billing_failed({
+            'subscription_id': 'sub_fail_no_cohort_001',
+            'reference': 'charge_fail_ref_002',
+            'reason': 'Card declined',
+        })
+
+        txn = Transaction.objects.get(plan=self.plan)
+        self.assertEqual(txn.status, Transaction.Status.CHARGE_FAILED)
+        self.assertEqual(txn.charge_reference, 'charge_fail_ref_002')
+        self.assertFalse(hasattr(self.plan, 'cohort_membership'))

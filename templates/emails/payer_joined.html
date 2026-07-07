@@ -1,0 +1,16 @@
+{% extends "emails/base.html" %}
+{% block title %}A payer has joined {{ cohort_name }}{% endblock %}
+{% block content %}
+<p style="margin: 0 0 16px; font-size: 16px; line-height: 1.5; color: #333333;">
+    Hi {{ organizer_name }},
+</p>
+<p style="margin: 0 0 16px; font-size: 16px; line-height: 1.5; color: #333333;">
+    <strong>{{ payer_email }}</strong> has joined your cohort <strong>{{ cohort_name }}</strong>.
+</p>
+<p style="margin: 0 0 24px; font-size: 16px; line-height: 1.5; color: #333333;">
+    Their plan is now active and recurring payments will begin according to the cohort schedule.
+</p>
+<p style="margin: 0 0 16px; font-size: 14px; line-height: 1.5; color: #888888;">
+    You can view your cohort dashboard to track all payers and payments.
+</p>
+{% endblock %}

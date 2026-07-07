@@ -3,7 +3,7 @@ from .views import (
     ResolveBankView, CreateSelfFundedPlanView, ListUserPlansView, 
     RetrieveUserPlanView, PausePlanView, ResumePlanView,
     RequestCancellationView, ConfirmCancellationView, ResolveLinkFundedPayPlanView,
-    CreateLinkFundedPayPlan
+    CreateLinkFundedPayPlan, PlanDetailsViaLinkView
 )
 
 urlpatterns = [
@@ -13,7 +13,8 @@ urlpatterns = [
     
     path('self-funded/create', CreateSelfFundedPlanView.as_view(), name='create-funded-plan'),
     path('link-funded/create', CreateLinkFundedPayPlan.as_view(), name='create-link-plan'),
-    path('link-funded/resolve', ResolveLinkFundedPayPlanView.as_view(), name='create-link-plan'),
+    path('link-funded/details', PlanDetailsViaLinkView.as_view(), name='plan-link-details'),
+    path('link-funded/resolve', ResolveLinkFundedPayPlanView.as_view(), name='resolve-link-plan'),
     
     path('<slug:sqid>/request-cancellation', RequestCancellationView.as_view(), name='request-cancellation'),
     path('<slug:sqid>/confirm-cancellation', ConfirmCancellationView.as_view(), name='confirm-cancellation'),

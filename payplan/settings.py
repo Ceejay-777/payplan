@@ -14,9 +14,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 SECRET_KEY = 'django-insecure-ufku8$$kjf0#co7&178se$03iv+4g&az=o3^8099!&yvnu46tv'
-ENVIRONMENT = os.getenv("ENVIRONMENT")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "DEVELOPMENT")
 
-DEBUG = ENVIRONMENT = "DEVELOPMENT"
+DEBUG = ENVIRONMENT == "DEVELOPMENT"
 
 ALLOWED_HOSTS = ['*'] # Allowed for hackathon development
 
@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'transactions',
     'webhooks',
     'notifications',
+    'cohorts',
 ]
 
 MIDDLEWARE = [

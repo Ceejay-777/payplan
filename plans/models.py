@@ -57,7 +57,8 @@ class PayPlan(BaseModel):
     max_billing_cycles = models.IntegerField(null=True, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     ends_at = models.DateTimeField(null=True, blank=True)
-    
+    cohort_id = models.CharField(max_length=100, null=True, blank=True, db_index=True)
+
     def save(self, *args, **kwargs):
         if (self.status != self.Status.DRAFT) and not self.creator:
             raise ValidationError(

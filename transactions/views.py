@@ -1,5 +1,5 @@
 from rest_framework import generics, permissions
-from .models import Transaction, DunningAttempt
+from .models import Transaction
 from .serializers import TransactionSerializer
 from plans.models import PayPlan
 from drf_spectacular.utils import extend_schema
