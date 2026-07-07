@@ -54,12 +54,6 @@ def handle_billing_success(data):
 
             charge_reference = data.get('reference')
 
-            # Idempotency: the engine charge reference is globally unique, so if
-            # we've already recorded a transaction with this reference we must
-            # not record it again or re-trigger a payout. Checking by
-            # (plan, cycle, reference) alone is not enough — billing_count
-            # advances after each call, so a duplicate delivery would compute
-            # a different cycle_number and slip past that check.
             existing_transaction = Transaction.objects.filter(
                 charge_reference=charge_reference,
             ).first()
