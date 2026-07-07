@@ -47,43 +47,46 @@ def handle_subscription_activated(data):
 
 def handle_billing_success(data):
     sub_engine_id = data.get('subscription_id')
-    
+
     try:
         with transaction.atomic():
             plan = PayPlan.objects.select_for_update().get(engine_subscription_id=sub_engine_id)
-            
-            # Idempotency check: check if transaction exists for this plan and cycle
-            cycle_number = plan.billing_count + 1
+
+            charge_reference = data.get('reference')
+
+            # Idempotency: the engine charge reference is globally unique, so if
+            # we've already recorded a transaction with this reference we must
+            # not record it again or re-trigger a payout. Checking by
+            # (plan, cycle, reference) alone is not enough — billing_count
+            # advances after each call, so a duplicate delivery would compute
+            # a different cycle_number and slip past that check.
             existing_transaction = Transaction.objects.filter(
-                plan=plan, 
-                billing_cycle_number=cycle_number,
-                charge_reference=data.get('reference')
+                charge_reference=charge_reference,
             ).first()
-            
+
             if existing_transaction:
                 sentry_sdk.set_tag("transaction_id", existing_transaction.sqid)
                 sentry_sdk.logger.info(
-                    "Billing success already handled for plan {plan_id} and cycle {cycle}",
-                    plan_id=plan.id,
-                    cycle=cycle_number
+                    "Billing success already handled for charge reference {charge_reference}",
+                    charge_reference=charge_reference,
                 )
                 return
 
-            # Record successful transaction or update existing one
+            cycle_number = plan.billing_count + 1
+
             transaction_record = record_transaction(
                 plan=plan,
-                charge_reference=data.get('reference'),
+                charge_reference=charge_reference,
                 amount=plan.amount,
                 cycle_number=cycle_number,
                 status=Transaction.Status.CHARGE_SUCCESS,
                 event_type=TransactionEvent.EventTypes.CHARGE_SUCCEEDED
             )
-            
+
             sentry_sdk.set_tag("transaction_id", transaction_record.sqid)
-            
-            # Update plan for next billing cycle
+
             update_plan_for_charge(plan, data)
-            
+
             sentry_sdk.logger.info(
                 "Billing success handled for plan {plan_id} with engine subscription ID {sub_engine_id}",
                 plan_id=plan.id,
@@ -92,7 +95,9 @@ def handle_billing_success(data):
                     "user_id": plan.creator.sqid,
                 }
             )
-            
+
+            create_and_run_first_payout_attempt(transaction_record)
+
     except PayPlan.DoesNotExist:
         sentry_sdk.logger.error(
             "Billing resolution failed: record not found for {sub_engine_id}",
@@ -105,9 +110,6 @@ def handle_billing_success(data):
             error=str(e),
         )
         raise
-    
-    # Start payout process to the receiver account
-    create_and_run_first_payout_attempt(transaction_record)
 
 
 # def handle_billing_failed(data):

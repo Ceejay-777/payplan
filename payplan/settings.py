@@ -80,19 +80,39 @@ ASGI_APPLICATION = "payplan.asgi.application"
 WSGI_APPLICATION = 'payplan.wsgi.application'
 
 
-tmpPostgres = urlparse(os.getenv("DATABASE_URL"))
+tmpDb = urlparse(os.getenv("DATABASE_URL", ""))
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': tmpPostgres.path.replace('/', ''),
-        'USER': tmpPostgres.username,
-        'PASSWORD': tmpPostgres.password,
-        'HOST': tmpPostgres.hostname,
-        'PORT': 5432,
-        'OPTIONS': dict(parse_qsl(tmpPostgres.query)),
+if tmpDb.scheme == "postgresql":
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': tmpDb.path.replace('/', ''),
+            'USER': tmpDb.username,
+            'PASSWORD': tmpDb.password,
+            'HOST': tmpDb.hostname,
+            'PORT': 5432,
+            'OPTIONS': dict(parse_qsl(tmpDb.query)),
+        }
     }
-}
+elif tmpDb.scheme == "sqlite":
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': tmpDb.path.lstrip('/'),
+        }
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': tmpDb.path.replace('/', ''),
+            'USER': tmpDb.username,
+            'PASSWORD': tmpDb.password,
+            'HOST': tmpDb.hostname,
+            'PORT': 5432,
+            'OPTIONS': dict(parse_qsl(tmpDb.query)),
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -221,6 +241,7 @@ SUB_ENGINE_API_KEY = os.environ.get('SUB_ENGINE_API_KEY')
 
 NOMBA_LIVE_BASE_URL = os.environ.get("NOMBA_LIVE_BASE_URL", "https://api.nomba.com")
 NOMBA_TEST_BASE_URL = os.environ.get("NOMBA_TEST_BASE_URL", "https://sandbox.nomba.com")
+
 NOMBA_LIVE_CLIENT_ID = os.environ.get("NOMBA_LIVE_CLIENT_ID")
 NOMBA_LIVE_PRIVATE_KEY = os.environ.get("NOMBA_LIVE_PRIVATE_KEY")
 NOMBA_TEST_CLIENT_ID = os.environ.get("NOMBA_TEST_CLIENT_ID")

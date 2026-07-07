@@ -17,7 +17,7 @@ def transfer(amount, account_number, account_name, bank_code, merchant_tx_ref, s
     }
     
     try:
-        response = nomba_request("POST", "transfers", payload=payload)
+        response = nomba_request("POST", "transfers/bank", payload=payload)
         
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
         sentry_sdk.logger.error(

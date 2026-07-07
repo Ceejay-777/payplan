@@ -1,12 +1,11 @@
+from payplan.nomba_payouts.client import lookup_bank_account
 from payplan.requests import sub_engine_request
 
 def resolve_bank_account(account_number, bank_code):
     """
     Resolves bank account name via Nomba.
     """
-    # TODO: Call Resolve bank account
-    
-    return "John Doe Account"
+    return lookup_bank_account(account_number, bank_code)
 
 def create_customer(user):
     payload = {

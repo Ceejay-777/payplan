@@ -1,0 +1,40 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Payout failed &mdash; PayPlan{% endblock %}
+
+{% block content %}
+  <p class="eyebrow" style="color: #b91c1c;">Payout</p>
+  <h1>Payout failed</h1>
+  <p class="body-text">
+    We collected the billing cycle but could not transfer the funds to your receiver account. The associated plan has been paused to prevent further issues.
+  </p>
+
+  <table style="border-collapse: collapse; margin: 16px 0; width: 100%;">
+    <tr>
+      <td style="padding: 8px 0; color: #555550; width: 40%;">Plan</td>
+      <td style="padding: 8px 0; font-weight: 600; color: #1a1a1a;">{{ plan_title }}</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 0; color: #555550;">Amount</td>
+      <td style="padding: 8px 0; font-weight: 600; color: #1a1a1a;">{{ currency }} {{ amount }}</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 0; color: #555550;">Billing cycle</td>
+      <td style="padding: 8px 0; color: #1a1a1a;">#{{ cycle_number }}</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 0; color: #555550;">Payout reference</td>
+      <td style="padding: 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: #1a1a1a;">{{ payout_reference }}</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 0; color: #555550;">Reason</td>
+      <td style="padding: 8px 0; color: #1a1a1a;">{{ failure_reason }}</td>
+    </tr>
+  </table>
+
+  <hr class="divider" />
+
+  <p class="body-text" style="margin-bottom: 0;">
+    The funds are still safely in the PayPlan account. To retry, please verify the receiver's bank account details and resume the plan from your dashboard.
+  </p>
+{% endblock %}

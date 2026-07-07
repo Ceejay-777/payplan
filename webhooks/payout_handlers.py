@@ -5,7 +5,8 @@ import sentry_sdk
 from transactions.services import set_transaction_succeeded, handle_payout_failure
 
 def handle_payout_success(data):
-    payout_reference = data.get('id')
+    print("Handling payout success")
+    payout_reference = data.get('transaction').get('transactionId')
     sentry_sdk.set_tag("payout_reference", payout_reference)
     try:
         with db_transaction.atomic():
@@ -25,7 +26,7 @@ def handle_payout_success(data):
             attempt.status = DunningAttempt.Status.SUCCESS
             attempt.save(update_fields=['status'])
 
-            set_transaction_succeeded(transaction)
+            set_transaction_succeeded(transaction, attempt=attempt)
 
     except DunningAttempt.DoesNotExist:
         sentry_sdk.logger.error(

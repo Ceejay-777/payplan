@@ -13,7 +13,6 @@ from payplan.nomba_auth import (
 
 logger = logging.getLogger(__name__)
 
-
 def nomba_request(method, endpoint, payload=None, timeout=10, version="v2"):
     """
     Make a request to the Nomba API using a token from the auth service.
@@ -26,6 +25,10 @@ def nomba_request(method, endpoint, payload=None, timeout=10, version="v2"):
     """
     creds = _active_credentials()
     url = f"{creds['base_url']}/{version}/{endpoint}/"
+    sentry_sdk.logger.info(
+        "Nomba request",
+        attributes={"method": method, "endpoint": endpoint, "url": url},
+    )
 
     def _do_call(token):
         headers = {
@@ -64,6 +67,10 @@ def nomba_request(method, endpoint, payload=None, timeout=10, version="v2"):
                 f"Nomba rejected token after refresh on {endpoint}"
             )
 
+    sentry_sdk.logger.info(
+        "Nomba request sent successfully",
+        attributes={"endpoint": endpoint},
+    )
     return response
 
 

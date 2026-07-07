@@ -19,6 +19,11 @@ from .webhookshandlers import (
 
 from .payout_handlers import handle_payout_success, handle_payout_refund
 
+from payplan.nomba_payouts.events import (
+    PAYOUT_SUCCESS,
+    PAYOUT_REFUND,
+)
+
 sub_engine_api_key = settings.SUB_ENGINE_API_KEY
 nomba_webhook_secret = settings.NOMBA_WEBHOOK_SECRET
 
@@ -28,8 +33,8 @@ EVENT_HANDLERS = {
 }
 
 NOMBA_EVENT_HANDLERS = {
-    "payout_success": handle_payout_success,
-    "payout_refund": handle_payout_refund,
+    PAYOUT_SUCCESS: handle_payout_success,
+    PAYOUT_REFUND: handle_payout_refund,
 }
 
 # @extend_schema(exclude=True)
@@ -105,7 +110,7 @@ class NombaWebhookView(APIView):
             event_type = event.get('event_type')
             data = event.get('data')
 
-            payout_reference = data.get('id')
+            payout_reference = data.get('transaction').get('transactionId')
             if payout_reference:
                 sentry_sdk.set_tag("payout_reference", payout_reference)
 
@@ -125,12 +130,13 @@ class NombaWebhookView(APIView):
 
             return Response({"detail": "Nomba webhook processed"}, status=status.HTTP_200_OK)
 
-        except Exception:
+        except Exception as e:
             sentry_sdk.logger.error(
                 "Error processing Nomba webhook",
                 exc_info=True,
                 attributes={"payload": payload.decode('utf-8'), "signature": signature},
             )
+            print(str(e))
             return Response(
                 {"detail": "Error processing Nomba webhook"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -64,6 +64,24 @@ class PayPlan(BaseModel):
                 "PayPlan cannot leave DRAFT status without a creator assigned."
             )
         super().save(*args, **kwargs)
+
+    def pause(self):
+        if self.status != self.Status.ACTIVE:
+            raise ValidationError("Only ACTIVE plans can be paused.")
+        self.status = self.Status.PAUSED
+        self.save(update_fields=['status'])
+
+    def resume(self):
+        if self.status != self.Status.PAUSED:
+            raise ValidationError("Only PAUSED plans can be resumed.")
+        self.status = self.Status.ACTIVE
+        self.save(update_fields=['status'])
+
+    def cancel(self):
+        if self.status in (self.Status.CANCELLED, self.Status.COMPLETED, self.Status.EXPIRED):
+            raise ValidationError(f"Cannot cancel a plan in {self.status} status.")
+        self.status = self.Status.CANCELLED
+        self.save(update_fields=['status'])
     
 class PayPlanEvent(models.Model):
     class EventTypes(models.TextChoices):

@@ -9,7 +9,10 @@ from .models import Transaction, DunningAttempt, TransactionEvent
 from .requests import transfer
 
 from transactions.exceptions import NombaConnectionError, NombaTransferRejected
-from transactions.models import Transaction, TransactionEvent, DunningAttempt
+from payplan.nomba_payouts.emails import (
+    send_payout_success_email,
+    send_payout_failure_email,
+)
 
 PAYOUT_SCHEDULES = [1, 4, 12] #NOTE: In hours
 
@@ -27,6 +30,7 @@ def _log_transaction_event(transaction, event_type, previous_status, new_status,
 def record_transaction(plan, charge_reference, amount, cycle_number, status, event_type, failure_reason=None):
     
     with db_transaction.atomic():
+        # Check with charge reference??
         transaction = Transaction.objects.select_for_update().filter(plan=plan, billing_cycle_number=cycle_number).first()
 
         if transaction:
@@ -92,7 +96,6 @@ def initiate_payout(attempt):
         )
         
         with db_transaction.atomic():
-            #TODO: Get actual payout reference
             attempt.payout_reference = payout_data.get('id')
             attempt.status = DunningAttempt.Status.AWAITING_CONFIRMATION
             attempt.save(update_fields=['payout_reference', 'status'])
@@ -133,29 +136,43 @@ def handle_payout_failure(attempt, reason):
     sentry_sdk.set_tag("transaction_id", transaction.sqid)
     sentry_sdk.set_tag("attempt_id", attempt.sqid)
     sentry_sdk.set_tag("attempt_number", attempt.attempt_number)
-    
+
+    plan = transaction.plan
+    pause_after = False
+
     with db_transaction.atomic():
         attempt.status = DunningAttempt.Status.FAILED
         attempt.failure_reason = reason
         attempt.save(update_fields=['status', 'failure_reason'])
-        
+
         previous_status = transaction.status
         transaction.status = Transaction.Status.PAYOUT_FAILED
         transaction.save(update_fields=['status'])
-        
+
         _log_transaction_event(
             transaction=transaction,
             event_type=TransactionEvent.EventTypes.PAYOUT_FAILED,
             previous_status=previous_status,
             new_status=Transaction.Status.PAYOUT_FAILED
         )
-        
+
         next_attempt_number = attempt.attempt_number + 1
         if next_attempt_number > len(PAYOUT_SCHEDULES):
-            pause_plan(transaction.plan)
-            return 
-    
-    schedule_next_payout_attempt(attempt)
+            pause_after = True
+        else:
+            next_attempt_to_schedule = attempt
+
+    if pause_after:
+        pause_plan(plan)
+        send_payout_failure_email(
+            plan=plan,
+            transaction=transaction,
+            attempt=attempt,
+            reason=reason,
+        )
+        return
+
+    schedule_next_payout_attempt(next_attempt_to_schedule)
 
 def schedule_next_payout_attempt(failed_attempt):
     transaction = failed_attempt.transaction
@@ -187,19 +204,38 @@ def pause_plan(plan):
     
     #TODO: Notify user about plan pause due to payout failures 
 
-def set_transaction_succeeded(transaction):
-    
+def set_transaction_succeeded(transaction, attempt=None):
+
+    if transaction.status == Transaction.Status.PAYOUT_SUCCESS:
+        sentry_sdk.logger.info(
+            "Payout success already recorded for transaction {transaction_id}",
+            transaction_id=transaction.sqid,
+        )
+        return
+
     previous_status = transaction.status
     transaction.status = Transaction.Status.PAYOUT_SUCCESS
     event_type = TransactionEvent.EventTypes.PAYOUT_SUCCEEDED
-    
+
     transaction.save(update_fields=['status'])
-    
+
     _log_transaction_event(
             transaction=transaction,
             event_type=event_type,
             previous_status=previous_status,
             new_status=Transaction.Status.PAYOUT_SUCCESS
         )
-    
-    # TODO: Send notification and email
+
+    if attempt is not None and transaction.plan and transaction.plan.creator:
+        try:
+            send_payout_success_email(
+                plan=transaction.plan,
+                transaction=transaction,
+                attempt=attempt,
+            )
+        except Exception:
+            sentry_sdk.logger.error(
+                "Payout success email failed",
+                exc_info=True,
+                attributes={"transaction_id": transaction.sqid},
+            )
